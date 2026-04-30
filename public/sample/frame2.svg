@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360">
+  <!-- 背景 -->
+  <rect width="640" height="360" fill="#87CEEB"/>
+  
+  <!-- 网球场地 -->
+  <rect x="100" y="200" width="440" height="160" fill="#228B22"/>
+  <line x1="100" y1="280" x2="540" y2="280" stroke="white" stroke-width="2"/>
+  <line x1="320" y1="200" x2="320" y2="360" stroke="white" stroke-width="2"/>
+  
+  <!-- 网球运动员轮廓 - 随挥动作 -->
+  <!-- 头部 -->
+  <circle cx="300" cy="95" r="15" fill="#FFD5B4"/>
+  
+  <!-- 身体 -->
+  <line x1="300" y1="110" x2="300" y2="175" stroke="#FFD5B4" stroke-width="20"/>
+  
+  <!-- 左臂（持拍手）- 随挥动作，向上挥起 -->
+  <line x1="300" y1="125" x2="380" y2="90" stroke="#FFD5B4" stroke-width="12"/>
+  <circle cx="395" cy="85" r="8" fill="#FFD5B4"/>
+  
+  <!-- 右臂（辅助手）- 自然摆动 -->
+  <line x1="300" y1="125" x2="250" y2="140" stroke="#FFD5B14" stroke-width="12"/>
+  <circle cx="240" cy="142" r="8" fill="#FFD5B4"/>
+  
+  <!-- 左腿 -->
+  <line x1="295" y1="175" x2="280" y2="235" stroke="#FFD5B4" stroke-width="15"/>
+  <ellipse cx="280" cy="245" rx="12" ry="6" fill="#333"/>
+  
+  <!-- 右腿 -->
+  <line x1="305" y1="175" x2="330" y2="230" stroke="#FFD5B4" stroke-width="15"/>
+  <ellipse cx="330" cy="240" rx="12" ry="6" fill="#333"/>
+  
+  <!-- 球拍 - 随挥位置 -->
+  <line x1="395" y1="85" x2="430" y2="60" stroke="#8B4513" stroke-width="4"/>
+  <ellipse cx="445" cy="50" rx="20" ry="25" fill="#00CED1" transform="rotate(-30 445 50)"/>
+  
+  <!-- 网球 - 已击出 -->
+  <circle cx="520" cy="110" r="8" fill="#FFFF00" stroke="#orange" stroke-width="1"/>
+  
+  <!-- 网球轨迹 -->
+  <path d="M 460 145 Q 490 120 520 110" stroke="yellow" stroke-width="2" fill="none" stroke-dasharray="5,5"/>
+  
+  <!-- 关键点标注 (将在PoseVisualization中绘制) -->
+  <text x="50" y="350" font-family="Arial" font-size="14" fill="#333">
+    Tennis Follow-through - Frame 2 (2.5s)
+  </text>
+</svg>

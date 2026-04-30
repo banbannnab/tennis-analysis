@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "env": {
+    "ZHIPU_API_KEY": "f5007dac92044ecb9fae83576cf963e7.OV15n8r4TC0jwJ9Z"
+  },
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_APP_URL": "https://your-domain.com"
+    }
+  }
+}
