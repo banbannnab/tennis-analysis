@@ -1,0 +1,4104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taste工坊 v3 - 训练工具版</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #0a0a0a;
+  color: #fff;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ===== 公共样式 ===== */
+.scene { display:none; min-height:100vh; }
+.scene.active { display:block; animation: fadeIn 0.6s ease; }
+@keyframes fadeIn { from {opacity:0; transform:translateY(20px);} to {opacity:1; transform:translateY(0);} }
+/* v3.3 通用折叠收起态：任意 scene 切走时向上压扁消失 */
+.scene.folding {
+  display: block !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  transform-origin: top center;
+  will-change: height, opacity, transform;
+  transition: height 0.55s cubic-bezier(0.65, 0, 0.35, 1),
+              padding 0.55s cubic-bezier(0.65, 0, 0.35, 1),
+              opacity 0.4s ease-out,
+              transform 0.55s cubic-bezier(0.65, 0, 0.35, 1);
+  animation: none !important;
+}
+.scene.folding.folding-end {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  opacity: 0 !important;
+  transform: translateY(-30px) scaleY(0.85) !important;
+}
+
+.container { max-width:1200px; margin:0 auto; padding:60px 30px; }
+
+.btn-primary {
+  padding:18px 50px; background:#fff; color:#000; border:none;
+  border-radius:980px; font-size:1.05em; font-weight:500; cursor:pointer;
+  transition: all 0.3s ease;
+}
+.btn-primary:hover { transform:scale(1.04); box-shadow:0 10px 40px rgba(255,255,255,0.2); }
+.btn-primary:disabled { opacity:0.3; cursor:not-allowed; transform:none; }
+
+.btn-ghost {
+  padding:14px 32px; background:transparent; color:#fff; border:1px solid #444;
+  border-radius:980px; font-size:0.95em; cursor:pointer; transition: all 0.3s ease;
+}
+.btn-ghost:hover { border-color:#fff; }
+
+/* ===== 第一幕：欢迎入场 ===== */
+#scene-welcome {
+  display:flex; align-items:center; justify-content:center; flex-direction:column;
+  text-align:center; padding:80px 30px;
+  /* v3.3: 折叠动画基础属性 */
+  transform-origin: top center;
+  will-change: height, opacity, transform;
+  transition: height 0.75s cubic-bezier(0.65, 0, 0.35, 1),
+              padding 0.75s cubic-bezier(0.65, 0, 0.35, 1),
+              opacity 0.5s ease-out 0.05s,
+              transform 0.75s cubic-bezier(0.65, 0, 0.35, 1);
+}
+#scene-welcome.active { display:flex; }
+/* welcome 折叠时仍保持 flex（覆盖通用 .scene.folding 的 display:block） */
+#scene-welcome.folding { display: flex !important; }
+/* v3.3 折叠动画结束后的终态：彻底从布局移除 welcome，避免它恢复原形 */
+#scene-welcome.folded-done {
+  display: none !important;
+}
+
+.welcome-tag {
+  display:inline-block; padding:6px 16px; background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.15); border-radius:980px;
+  font-size:0.85em; color:#aaa; margin-bottom:30px;
+}
+
+.welcome-title {
+  font-size:4em; font-weight:700; margin-bottom:20px; letter-spacing:-1px;
+  background: linear-gradient(135deg, #fff 0%, #999 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+
+.welcome-subtitle {
+  font-size:1.3em; color:#888; max-width:600px; margin-bottom:60px; font-weight:300;
+}
+
+.welcome-highlights {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:20px;
+  max-width:900px; width:100%; margin-bottom:60px;
+}
+.highlight-card {
+  background:#141414; border:1px solid #1f1f1f; border-radius:20px;
+  padding:30px 25px; text-align:left; transition: all 0.3s ease;
+}
+.highlight-card:hover { border-color:#333; transform:translateY(-4px); }
+.highlight-num {
+  font-size:0.85em; color:#666; margin-bottom:12px; letter-spacing:2px;
+}
+.highlight-title {
+  font-size:1.15em; font-weight:600; margin-bottom:10px; color:#fff;
+}
+.highlight-desc {
+  font-size:0.9em; color:#888; line-height:1.7;
+}
+
+@media (max-width:768px) {
+  .welcome-title { font-size:2.5em; }
+  .welcome-highlights { grid-template-columns:1fr; }
+}
+
+/* ===== 通用关卡布局 ===== */
+.scene-header {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:25px 40px; border-bottom:1px solid #1a1a1a;
+  position:sticky; top:0; background:rgba(10,10,10,0.95);
+  backdrop-filter: blur(10px); z-index:100;
+}
+.scene-step {
+  display:flex; align-items:center; gap:12px; font-size:0.9em; color:#888;
+}
+.step-dot { width:6px; height:6px; border-radius:50%; background:#333; }
+.step-dot.done { background:#fff; }
+.step-dot.current { background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,0.15); }
+
+.scene-title-area { padding:60px 40px 30px; max-width:1200px; margin:0 auto; }
+.scene-title { font-size:2.5em; font-weight:600; margin-bottom:12px; }
+.scene-desc { font-size:1.1em; color:#888; max-width:700px; line-height:1.7; }
+
+.scene-body { padding:0 40px 40px; max-width:1200px; margin:0 auto; }
+.scene-footer {
+  padding:30px 40px; border-top:1px solid #1a1a1a;
+  display:flex; justify-content:space-between; align-items:center;
+  position:sticky; bottom:0; background:rgba(10,10,10,0.95);
+  backdrop-filter: blur(10px);
+}
+
+/* ===== 第二幕：定方向（拖拽选择 + 连线） ===== */
+.direction-grid {
+  display:grid; grid-template-columns:repeat(2,1fr); gap:20px; margin-top:30px;
+}
+.direction-card {
+  background:#141414; border:1px solid #1f1f1f; border-radius:18px;
+  padding:30px 25px; cursor:pointer; transition: all 0.3s ease;
+}
+.direction-card:hover { border-color:#444; transform:translateY(-2px); }
+.direction-card.selected { border-color:#fff; background:#1a1a1a; }
+.direction-card h3 {
+  font-size:1.2em; font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:10px;
+}
+.direction-card .check {
+  width:20px; height:20px; border-radius:50%; border:2px solid #444;
+  margin-left:auto; transition: all 0.3s ease;
+}
+.direction-card.selected .check {
+  background:#fff; border-color:#fff;
+  box-shadow:inset 0 0 0 4px #1a1a1a;
+}
+.direction-card p {
+  font-size:0.9em; color:#888; line-height:1.7;
+}
+.direction-card .examples {
+  margin-top:14px; padding-top:14px; border-top:1px solid #222;
+  font-size:0.8em; color:#666;
+}
+
+/* 用户对象连线 */
+.user-match {
+  display:grid; grid-template-columns:1fr 80px 1fr; gap:20px; margin-top:40px;
+  background:#0f0f0f; border-radius:20px; padding:30px;
+}
+
+/* v3.1新增：服务对象选择 + 需求洞察排序 */
+.user-pick-grid {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:20px;
+}
+.user-pick-card {
+  background:#141414; border:2px solid #1f1f1f; border-radius:16px;
+  padding:22px 18px; cursor:pointer; transition: all 0.3s ease;
+  text-align:center;
+}
+.user-pick-card:hover { border-color:#444; transform:translateY(-3px); }
+.user-pick-card.selected {
+  border-color:#fff; background:#1d1d1d;
+}
+.user-pick-card .up-emoji {
+  font-size:2em; margin-bottom:8px; line-height:1;
+}
+.user-pick-card .up-name {
+  font-size:1.05em; font-weight:600; color:#fff; margin-bottom:6px;
+}
+.user-pick-card .up-tag {
+  font-size:0.78em; color:#888;
+}
+.needs-rank-section {
+  background:#0f0f0f; border:1px solid #1f1f1f; border-radius:18px;
+  padding:24px; margin-top:30px;
+  animation: fadeInDown 0.5s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+@keyframes fadeInDown {
+  from { opacity:0; transform:translateY(-10px); }
+  to { opacity:1; transform:translateY(0); }
+}
+.needs-head { margin-bottom:16px; }
+.needs-head h4 { font-size:1.05em; font-weight:600; color:#fff; margin-bottom:6px; }
+.needs-head .needs-hint { font-size:0.85em; color:#888; line-height:1.7; }
+.needs-head .needs-hint span { color:#fff; font-weight:500; }
+.needs-list { display:flex; flex-direction:column; gap:8px; }
+.need-item {
+  background:#1a1a1a; border:1px solid #222; border-radius:12px;
+  padding:14px 16px; cursor:grab; transition: all 0.2s ease;
+  display:flex; align-items:center; gap:14px;
+}
+.need-item:hover { border-color:#444; }
+.need-item.dragging { opacity:0.4; }
+.need-item .need-rank {
+  width:28px; height:28px; border-radius:50%; background:#222;
+  display:flex; align-items:center; justify-content:center;
+  font-size:0.85em; font-weight:600; color:#888; flex-shrink:0;
+  transition: all 0.3s ease;
+}
+.need-item:nth-child(1) .need-rank {
+  background:linear-gradient(135deg, #fff, #aaa); color:#000;
+}
+.need-item:nth-child(2) .need-rank {
+  background:rgba(255,255,255,0.4); color:#fff;
+}
+.need-item .need-content {
+  flex:1; font-size:0.92em;
+}
+.need-item .need-content .need-title { color:#fff; font-weight:500; }
+.need-item .need-content .need-desc { color:#888; font-size:0.82em; margin-top:3px; line-height:1.6; }
+.need-item .need-handle { color:#444; cursor:grab; font-size:1.2em; }
+.needs-tip {
+  margin-top:14px; padding:14px 16px;
+  background:rgba(74,222,128,0.05); border-left:3px solid #4ade80;
+  border-radius:0 10px 10px 0;
+  font-size:0.88em; color:#bbb; line-height:1.7;
+  animation: fadeInDown 0.4s ease;
+}
+.needs-tip strong { color:#4ade80; }
+
+/* ============ v3.2 新增：微信哲学注释 ============ */
+.philosophy-section {
+  border:1px solid rgba(7,193,96,0.2);
+  background:linear-gradient(135deg, rgba(7,193,96,0.05) 0%, transparent 100%);
+}
+.phi-section-head { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.phi-section-head h4 { font-size:1em; }
+.phi-mini-tag {
+  font-size:0.7em; padding:2px 8px; background:rgba(7,193,96,0.15);
+  color:#07c160; border-radius:4px; font-weight:600; letter-spacing:1px;
+}
+.philosophy-note {
+  margin-top:14px; padding:12px 14px;
+  background:rgba(7,193,96,0.06); border-left:3px solid #07c160;
+  border-radius:0 10px 10px 0;
+  font-size:0.85em; color:#bbb; line-height:1.7;
+  display:flex; gap:10px; align-items:flex-start;
+  animation: fadeInDown 0.4s ease;
+}
+.phi-tag {
+  flex-shrink:0; font-size:0.7em; padding:2px 8px; background:rgba(7,193,96,0.2);
+  color:#07c160; border-radius:4px; font-weight:600; letter-spacing:1px;
+}
+
+/* 品牌名输入 */
+.brand-input {
+  width:100%; padding:14px 18px;
+  background:#1a1a1a; border:1px solid #222; border-radius:12px;
+  color:#fff; font-size:1em; font-family:inherit;
+  transition: all 0.2s ease;
+}
+.brand-input:focus { outline:none; border-color:#07c160; }
+
+/* ============ v3.2 写实手机预览 ============ */
+.phone-frame.realistic {
+  position:relative;
+  background:#1a1a1a;
+  border-radius:42px;
+  padding:6px;
+  border:none;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6),
+              inset 0 0 0 2px #2a2a2a;
+}
+.phone-notch {
+  position:absolute; top:6px; left:50%; transform:translateX(-50%);
+  width:120px; height:24px; background:#000;
+  border-radius:0 0 18px 18px;
+  z-index:20;
+}
+.phone-display.realistic {
+  background:#f5f5f7;
+  border-radius:36px;
+  overflow:hidden;
+  min-height:680px;
+  position:relative;
+  display:flex;
+  flex-direction:column;
+}
+
+/* 状态栏 */
+.rl-status-bar {
+  height:36px; padding:8px 28px 4px;
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:0.78em; color:#000; font-weight:600;
+  position:relative; z-index:5;
+}
+.rl-time { padding-left:6px; }
+.rl-icons { display:flex; gap:4px; align-items:center; font-size:0.85em; }
+.rl-signal { letter-spacing:-2px; }
+
+/* 顶部品牌区 */
+.rl-brand-bar {
+  padding:18px 22px 16px;
+  background:linear-gradient(135deg,#1a1a1a,#444);
+  color:#fff;
+  transition: all 0.4s ease;
+}
+.rl-logo {
+  font-size:1.05em; font-weight:700; opacity:0.9;
+  margin-bottom:14px; letter-spacing:0.5px;
+}
+.rl-greeting {
+  font-size:1.5em; font-weight:600; line-height:1.3;
+  margin-bottom:4px;
+}
+.rl-greeting:empty { display:none; }
+.rl-slogan {
+  font-size:0.78em; opacity:0.75;
+}
+.rl-slogan:empty { display:none; }
+
+/* 内容区 */
+.rl-content {
+  flex:1;
+  padding:18px;
+  overflow:hidden;
+  background:#f5f5f7;
+}
+.rl-card {
+  background:#fff;
+  padding:14px;
+  margin-bottom:10px;
+  border-radius:14px;
+  transition: all 0.3s ease;
+}
+.rl-card .rl-card-head {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:6px;
+}
+.rl-card .rl-card-title {
+  font-size:0.92em; font-weight:600; color:#1a1a1a;
+}
+.rl-card .rl-card-tag {
+  font-size:0.65em; padding:2px 8px;
+  background:rgba(0,0,0,0.06); color:#666;
+  border-radius:4px;
+}
+.rl-card .rl-card-tag.hot { background:rgba(248,113,113,0.15); color:#dc2626; }
+.rl-card .rl-card-desc {
+  font-size:0.78em; color:#666; line-height:1.55;
+}
+.rl-card .rl-card-meta {
+  margin-top:6px; font-size:0.7em; color:#999;
+  display:flex; gap:10px; align-items:center;
+}
+
+.rl-card.empty-state {
+  text-align:center; padding:30px 20px;
+  background:transparent; box-shadow:none;
+  color:#999; font-size:0.82em;
+}
+
+.rl-card.ad-card {
+  background:#f8f5e9; border:1px solid #fef3c7;
+}
+.rl-card.ad-card .rl-card-tag { background:#fbbf24; color:#000; }
+
+/* 主行动按钮 */
+.rl-main-btn {
+  position:absolute;
+  background:#000; color:#fff;
+  font-size:0.88em; font-weight:600;
+  display:flex; align-items:center; justify-content:center;
+  z-index:5; transition: all 0.3s ease;
+  cursor:default;
+}
+
+/* 底部Tab */
+.rl-tabbar {
+  background:#fff;
+  border-top:1px solid #ececec;
+  display:flex; justify-content:space-around; align-items:center;
+  height:54px; flex-shrink:0;
+  padding-bottom:8px;
+}
+.rl-tabbar.top {
+  border-top:none; border-bottom:1px solid #ececec;
+  order:-1;
+}
+.rl-tabbar.drawer {
+  position:absolute; left:0; top:0; bottom:0; width:48px;
+  flex-direction:column; padding:80px 0 30px;
+  border-top:none; border-right:1px solid #ececec;
+  justify-content:flex-start; gap:18px; height:auto;
+}
+.rl-tab {
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  font-size:0.65em; color:#999;
+  transition: color 0.2s ease;
+}
+.rl-tab.active { color:#000; font-weight:600; }
+.rl-tab-icon { font-size:1em; }
+.match-col { display:flex; flex-direction:column; gap:14px; }
+.match-item {
+  background:#1a1a1a; border:1px solid #222; border-radius:12px;
+  padding:16px 18px; cursor:pointer; transition: all 0.3s ease;
+  position:relative; font-size:0.95em;
+}
+.match-item:hover { border-color:#444; }
+.match-item.selected { border-color:#fff; background:#222; }
+.match-item.matched { border-color:#4ade80; background:rgba(74,222,128,0.08); }
+.match-divider {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  color:#444; font-size:0.85em;
+}
+
+/* ===== 第三幕：定背景（场景 + 痛点排序） ===== */
+.scenario-cards {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:30px;
+}
+.scenario-card {
+  background:#141414; border:2px solid #1f1f1f; border-radius:20px;
+  padding:35px 25px; cursor:pointer; transition: all 0.3s ease; text-align:center;
+}
+.scenario-card:hover { border-color:#444; transform:translateY(-4px); }
+.scenario-card.selected { border-color:#fff; background:#1a1a1a; }
+.scenario-card .time { font-size:0.85em; color:#888; margin-bottom:10px; letter-spacing:1px; }
+.scenario-card h3 { font-size:1.15em; font-weight:600; margin-bottom:8px; }
+.scenario-card p { font-size:0.85em; color:#888; line-height:1.6; }
+
+.painpoint-section {
+  margin-top:50px; background:#0f0f0f; border-radius:20px; padding:30px;
+}
+.painpoint-section h4 {
+  font-size:1.1em; font-weight:600; margin-bottom:6px;
+}
+.painpoint-section .hint { font-size:0.85em; color:#888; margin-bottom:20px; }
+
+.painpoint-list { display:flex; flex-direction:column; gap:10px; }
+.painpoint-item {
+  background:#1a1a1a; border:1px solid #222; border-radius:12px;
+  padding:14px 18px; cursor:grab; display:flex; align-items:center; gap:14px;
+  transition: all 0.2s ease;
+}
+.painpoint-item:hover { border-color:#444; }
+.painpoint-item.dragging { opacity:0.4; }
+.painpoint-rank {
+  width:28px; height:28px; border-radius:50%; background:#222;
+  display:flex; align-items:center; justify-content:center;
+  font-size:0.85em; font-weight:600; color:#888;
+}
+.painpoint-item:nth-child(1) .painpoint-rank { background:#fff; color:#000; }
+.painpoint-text { flex:1; font-size:0.95em; }
+.painpoint-handle { color:#444; cursor:grab; }
+
+/* ===== 第四幕：搭MVP（10选3 抹掉） ===== */
+.mvp-stats {
+  display:flex; justify-content:space-between; align-items:center;
+  background:#0f0f0f; border-radius:14px; padding:18px 24px; margin-top:30px;
+  border:1px solid #1f1f1f;
+}
+.mvp-stat-item { font-size:0.95em; }
+.mvp-stat-item .num {
+  font-size:1.6em; font-weight:600; margin-right:6px;
+}
+.mvp-stat-item.warning .num { color:#fbbf24; }
+.mvp-stat-item.success .num { color:#4ade80; }
+.mvp-stat-item .label { color:#888; font-size:0.85em; }
+
+.mvp-features {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:24px;
+}
+.feature-card {
+  background:#141414; border:1px solid #1f1f1f; border-radius:14px;
+  padding:18px 18px 14px; transition: all 0.3s ease; position:relative;
+  display:flex; flex-direction:column;
+}
+.feature-card:hover { border-color:#333; }
+.feature-card.kept {
+  border-color:#4ade80; background:rgba(74,222,128,0.06);
+}
+.feature-card.removed {
+  opacity:0.4; border-color:#3f1212; background:rgba(248,113,113,0.04);
+}
+.feature-card.removed .feat-name { text-decoration:line-through; color:#666; }
+.feature-card.removed .feat-desc { text-decoration:line-through; color:#555; }
+.feature-card .feat-name {
+  font-size:1em; font-weight:600; margin-bottom:6px;
+}
+.feature-card .feat-desc {
+  font-size:0.82em; color:#888; line-height:1.5; flex:1;
+}
+.feature-card .feat-state {
+  position:absolute; top:14px; right:14px;
+  font-size:0.7em; font-weight:600;
+  padding:3px 8px; border-radius:980px;
+  display:none;
+}
+.feature-card.kept .feat-state {
+  display:inline-block; background:#4ade80; color:#000;
+}
+.feature-card.kept .feat-state::before { content:"✓ 保留"; }
+.feature-card.removed .feat-state {
+  display:inline-block; background:#f87171; color:#fff;
+}
+.feature-card.removed .feat-state::before { content:"✕ 划掉"; }
+.feat-buttons {
+  display:flex; gap:8px; margin-top:12px;
+  padding-top:12px; border-top:1px solid #1f1f1f;
+}
+.feat-btn {
+  flex:1; padding:8px 0; background:transparent; color:#888;
+  border:1px solid #2a2a2a; border-radius:8px;
+  font-size:0.82em; cursor:pointer; transition: all 0.2s ease;
+  font-family:inherit;
+}
+.feat-btn:hover { border-color:#444; color:#fff; }
+.feat-btn.keep-btn.active {
+  background:#4ade80; color:#000; border-color:#4ade80;
+}
+.feat-btn.cut-btn.active {
+  background:#f87171; color:#fff; border-color:#f87171;
+}
+.feat-btn.disabled { opacity:0.4; cursor:not-allowed; }
+.feat-btn.disabled:hover { border-color:#2a2a2a; color:#888; }
+
+.mvp-help {
+  margin-top:30px; padding:20px; background:#0f0f0f; border-left:3px solid #fff;
+  border-radius:0 12px 12px 0;
+}
+.mvp-help h5 { font-size:0.95em; margin-bottom:8px; }
+.mvp-help p { font-size:0.85em; color:#888; line-height:1.7; }
+
+/* ===== 第五幕：定风格（颜色 + 文案 + 实时预览） ===== */
+.style-grid {
+  display:grid; grid-template-columns:1fr 380px; gap:40px; margin-top:30px;
+}
+
+.style-controls { display:flex; flex-direction:column; gap:30px; }
+.style-section {
+  background:#0f0f0f; border:1px solid #1f1f1f; border-radius:18px; padding:24px;
+}
+.style-section h4 { font-size:1em; margin-bottom:6px; }
+.style-section .style-hint { font-size:0.82em; color:#888; margin-bottom:18px; }
+
+.color-options { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.color-option {
+  height:90px; border-radius:14px; cursor:pointer; transition: all 0.3s ease;
+  border:3px solid transparent; position:relative; overflow:hidden;
+}
+.color-option:hover { transform:translateY(-3px); }
+.color-option.selected { border-color:#fff; transform:translateY(-3px); }
+.color-option .label {
+  position:absolute; bottom:8px; left:10px;
+  font-size:0.75em; color:#fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.copy-options { display:flex; flex-direction:column; gap:10px; }
+.copy-option {
+  background:#1a1a1a; border:1px solid #222; border-radius:12px;
+  padding:14px 18px; cursor:pointer; transition: all 0.2s ease; font-size:0.9em;
+}
+.copy-option:hover { border-color:#444; }
+.copy-option.selected { border-color:#fff; background:#222; }
+
+/* v2 新增：组件Taste（按钮/位置/导航/圆角） */
+.comp-grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.comp-grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.comp-card {
+  background:#1a1a1a; border:2px solid #222; border-radius:12px;
+  padding:12px 8px; cursor:pointer; transition: all 0.2s ease;
+  text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px;
+}
+.comp-card:hover { border-color:#444; }
+.comp-card.selected { border-color:#fff; background:#222; }
+.comp-card .c-name { font-size:0.72em; color:#aaa; }
+
+/* 按钮形状预览 */
+.btn-shape-preview {
+  width:90%; height:30px; background:#fff; color:#000;
+  display:flex; align-items:center; justify-content:center;
+  font-size:0.7em; font-weight:600;
+}
+
+/* 按钮位置预览 */
+.btn-pos-preview { width:100%; height:48px; background:#252525; border-radius:6px; position:relative; }
+.btn-pos-preview::after { content:''; position:absolute; background:#fff; border-radius:2px; }
+.comp-card[data-pos="bottom"] .btn-pos-preview::after { left:6px; right:6px; bottom:5px; height:6px; }
+.comp-card[data-pos="float"] .btn-pos-preview::after { right:6px; bottom:6px; width:18px; height:18px; border-radius:50%; }
+.comp-card[data-pos="inline"] .btn-pos-preview::after { left:6px; width:50%; bottom:50%; transform:translateY(50%); height:6px; }
+
+/* 导航预览 */
+.nav-preview { width:100%; height:54px; background:#252525; border-radius:6px; position:relative; }
+.comp-card[data-nav="bottom"] .nav-preview::after { content:''; position:absolute; left:0; right:0; bottom:0; height:12px; background:#fff; border-radius:0 0 6px 6px; }
+.comp-card[data-nav="top"] .nav-preview::after { content:''; position:absolute; left:0; right:0; top:0; height:12px; background:#fff; border-radius:6px 6px 0 0; }
+.comp-card[data-nav="drawer"] .nav-preview::after { content:''; position:absolute; left:0; top:0; bottom:0; width:12px; background:#fff; border-radius:6px 0 0 6px; }
+
+/* 圆角预览 */
+.radius-preview { width:30px; height:30px; background:#fff; }
+.comp-card[data-r="0"] .radius-preview { border-radius:0; }
+.comp-card[data-r="6"] .radius-preview { border-radius:6px; }
+.comp-card[data-r="14"] .radius-preview { border-radius:14px; }
+.comp-card[data-r="50"] .radius-preview { border-radius:50%; }
+
+/* 手机预览补充：按钮/导航 */
+.preview-btn {
+  position:absolute; background:#000; color:#fff;
+  font-size:0.78em; font-weight:600;
+  display:flex; align-items:center; justify-content:center;
+  transition: all 0.3s ease; z-index:5;
+}
+.preview-nav {
+  position:absolute; background:#fff;
+  display:flex; align-items:center; justify-content:space-around;
+  font-size:0.7em; color:#999;
+}
+.preview-nav.bottom { left:0; right:0; bottom:0; height:50px; border-top:1px solid #eee; }
+.preview-nav.top { left:0; right:0; top:0; height:44px; border-bottom:1px solid #eee; }
+.preview-nav.drawer { left:0; top:0; bottom:0; width:42px; flex-direction:column; padding:14px 0; gap:14px; border-right:1px solid #eee; }
+
+/* 手机预览 */
+.style-preview {
+  position:sticky; top:120px; height:fit-content;
+}
+.phone-frame {
+  width:100%; max-width:340px; margin:0 auto;
+  background:#000; border-radius:36px; padding:14px;
+  border:6px solid #1a1a1a; box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.phone-display {
+  background:#fff; border-radius:24px; overflow:hidden;
+  min-height:600px; position:relative;
+}
+.preview-header {
+  height:90px; display:flex; align-items:flex-end; padding:0 20px 16px;
+  color:#fff; transition: background 0.4s ease;
+}
+.preview-greeting {
+  font-size:1.4em; font-weight:600; transition: all 0.3s ease;
+}
+.preview-content {
+  padding:20px;
+}
+.preview-card {
+  background:#f5f5f7; border-radius:14px; padding:14px;
+  margin-bottom:10px; font-size:0.85em; color:#1d1d1f;
+}
+.preview-card h5 { font-weight:600; margin-bottom:4px; }
+.preview-card p { color:#666; font-size:0.85em; }
+
+/* ===== 第七幕：成果 + Taste画像 ===== */
+#scene-result { padding:60px 30px; }
+.result-hero { text-align:center; margin-bottom:50px; }
+.result-tag {
+  display:inline-block; padding:6px 16px; background:rgba(255,255,255,0.08);
+  border-radius:980px; font-size:0.85em; color:#aaa; margin-bottom:20px;
+}
+.result-title {
+  font-size:3em; font-weight:700; margin-bottom:14px;
+  background: linear-gradient(135deg, #fff 0%, #999 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.result-subtitle { font-size:1.1em; color:#888; max-width:600px; margin:0 auto; }
+
+.result-grid {
+  display:grid; grid-template-columns:380px 1fr; gap:50px;
+  max-width:1100px; margin:0 auto;
+}
+
+.result-phone .phone-frame { max-width:340px; }
+
+.result-info { display:flex; flex-direction:column; gap:24px; }
+
+.persona-card {
+  background:linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%);
+  border:1px solid #2a2a2a; border-radius:24px; padding:35px;
+}
+.persona-label {
+  font-size:0.85em; color:#888; margin-bottom:8px; letter-spacing:1px;
+}
+.persona-name {
+  font-size:2.2em; font-weight:700; margin-bottom:14px;
+  background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.persona-desc {
+  font-size:1em; color:#bbb; line-height:1.8; margin-bottom:20px;
+}
+.persona-tags { display:flex; flex-wrap:wrap; gap:8px; }
+.persona-tag {
+  padding:6px 14px; background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:980px; font-size:0.82em; color:#ddd;
+}
+
+.insights-card {
+  background:#0f0f0f; border:1px solid #1f1f1f; border-radius:20px; padding:28px;
+}
+.insights-card h4 { font-size:1.1em; margin-bottom:18px; }
+.insight-item {
+  display:flex; gap:14px; padding:14px 0;
+  border-bottom:1px solid #1a1a1a;
+}
+.insight-item:last-child { border-bottom:none; }
+.insight-item .num {
+  flex-shrink:0; width:28px; height:28px; border-radius:50%;
+  background:#1a1a1a; display:flex; align-items:center; justify-content:center;
+  font-size:0.85em; font-weight:600;
+}
+.insight-text { font-size:0.9em; color:#bbb; line-height:1.7; }
+
+.similar-card {
+  background:#0f0f0f; border:1px solid #1f1f1f; border-radius:20px; padding:28px;
+}
+.similar-card h4 { font-size:1.1em; margin-bottom:14px; }
+.similar-card p { font-size:0.9em; color:#888; line-height:1.8; }
+.similar-products { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+.similar-prod {
+  padding:10px 16px; background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; font-size:0.9em; color:#ddd;
+}
+
+/* v2新增：深度Insight样式（现象→因果→引申） */
+.insight-item {
+  padding:16px 0; border-bottom:1px solid #1a1a1a;
+}
+.insight-item:last-child { border-bottom:none; }
+.insight-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.insight-head .num {
+  flex-shrink:0; width:24px; height:24px; border-radius:50%;
+  background:#1a1a1a; display:flex; align-items:center; justify-content:center;
+  font-size:0.78em; font-weight:600;
+}
+.insight-head .title { font-size:0.95em; font-weight:600; color:#fff; }
+.insight-body { font-size:0.88em; color:#aaa; line-height:1.75; padding-left:34px; }
+.insight-body .layer {
+  margin-bottom:8px; padding-left:14px; border-left:2px solid #2a2a2a;
+}
+.insight-body .layer-label {
+  display:inline-block; font-size:0.75em; color:#666;
+  background:#181818; padding:2px 8px; border-radius:4px; margin-right:6px;
+  font-weight:500;
+}
+.insight-body strong { color:#ddd; }
+
+/* v2新增：微信价值观卡片 */
+.wechat-card {
+  background:linear-gradient(135deg, rgba(7,193,96,0.1) 0%, rgba(7,193,96,0.02) 100%);
+  border:1px solid rgba(7,193,96,0.25); border-radius:20px; padding:28px;
+}
+.wechat-card .wc-tag {
+  display:inline-block; padding:4px 12px; background:rgba(7,193,96,0.2);
+  border-radius:980px; font-size:0.78em; color:#07c160; margin-bottom:14px; letter-spacing:1px;
+}
+.wechat-card h4 { font-size:1.1em; margin-bottom:6px; }
+.wechat-card .wc-intro { font-size:0.85em; color:#888; line-height:1.7; margin-bottom:16px; }
+.wechat-principles { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
+.wc-principle {
+  background:rgba(255,255,255,0.04); border-radius:12px; padding:14px 16px;
+  font-size:0.88em; line-height:1.7;
+}
+.wc-principle .wc-name { font-weight:600; color:#07c160; display:block; margin-bottom:4px; }
+.wc-principle .wc-text { color:#bbb; }
+.wc-conclusion {
+  margin-top:16px; padding:14px 16px;
+  background:rgba(0,0,0,0.3); border-left:3px solid #07c160;
+  border-radius:0 10px 10px 0;
+  font-size:0.88em; color:#ddd; line-height:1.7;
+}
+
+/* v2新增：产品故事卡片 */
+.stories-card {
+  background:#0f0f0f; border:1px solid #1f1f1f; border-radius:20px; padding:28px;
+}
+.stories-card h4 { font-size:1.1em; margin-bottom:6px; }
+.stories-card .stories-hint { font-size:0.82em; color:#888; margin-bottom:18px; }
+.story-item {
+  background:#141414; border:1px solid #1f1f1f; border-radius:14px;
+  padding:18px; margin-bottom:10px; transition: all 0.3s ease;
+}
+.story-item:hover { border-color:#333; transform:translateX(4px); }
+.story-head {
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
+}
+.story-prod { font-size:1em; font-weight:600; color:#fff; }
+.story-tag {
+  font-size:0.72em; padding:3px 10px; background:rgba(255,255,255,0.08);
+  border-radius:980px; color:#aaa;
+}
+.story-text { font-size:0.85em; color:#999; line-height:1.7; }
+.story-takeaway {
+  margin-top:10px; padding:10px 12px;
+  background:rgba(251,191,36,0.05); border-radius:8px;
+  font-size:0.83em; color:#bbb;
+}
+.story-takeaway::before { content:"💡 给你的启发： "; color:#fbbf24; font-weight:600; }
+
+/* v2.1升级：Taste提升路径 — 改为"补短板"逻辑，配色改暖橙色表示"需要关注" */
+.growth-card {
+  background:linear-gradient(135deg, rgba(251,146,60,0.08) 0%, rgba(251,146,60,0.02) 100%);
+  border:1px solid rgba(251,146,60,0.25); border-radius:20px; padding:28px;
+}
+.growth-card .g-tag {
+  display:inline-block; padding:4px 12px; background:rgba(251,146,60,0.2);
+  border-radius:980px; font-size:0.78em; color:#fb923c; margin-bottom:14px; letter-spacing:1px;
+}
+.growth-card h4 { font-size:1.1em; margin-bottom:6px; }
+.growth-card .g-intro { font-size:0.85em; color:#888; line-height:1.7; margin-bottom:18px; }
+
+/* v2.1新增：Taste五维得分条 */
+.taste-dims { display:flex; flex-direction:column; gap:10px; margin:20px 0 22px; }
+.taste-dim {
+  display:grid; grid-template-columns:110px 1fr 60px; gap:12px; align-items:center;
+  font-size:0.85em;
+}
+.taste-dim .dim-name { color:#bbb; font-weight:500; display:flex; align-items:center; }
+.taste-dim .dim-bar-wrap {
+  height:8px; background:rgba(255,255,255,0.06); border-radius:4px; overflow:hidden;
+}
+.taste-dim .dim-bar {
+  height:100%; border-radius:4px; transition:width 0.8s ease;
+  background:linear-gradient(90deg, #60a5fa, #a78bfa);
+}
+.taste-dim.strong .dim-bar { background:linear-gradient(90deg, #4ade80, #10b981); }
+.taste-dim.weak .dim-bar { background:linear-gradient(90deg, #f87171, #fb923c); }
+.taste-dim .dim-score { color:#aaa; font-size:0.82em; text-align:right; font-variant-numeric:tabular-nums; }
+.taste-dim .dim-tag {
+  display:inline-block; font-size:0.7em; padding:1px 7px; border-radius:4px;
+  margin-left:6px;
+}
+.taste-dim.strong .dim-tag { background:rgba(74,222,128,0.15); color:#4ade80; }
+.taste-dim.weak .dim-tag { background:rgba(248,113,113,0.15); color:#f87171; }
+
+/* 短板分析总结 */
+.gap-summary {
+  background:rgba(0,0,0,0.25); border-left:3px solid #fb923c;
+  border-radius:0 10px 10px 0; padding:14px 16px; margin:16px 0 22px;
+  font-size:0.88em; color:#ddd; line-height:1.75;
+}
+.gap-summary strong { color:#fb923c; }
+
+.growth-paths { display:flex; flex-direction:column; gap:12px; }
+.growth-path {
+  background:rgba(255,255,255,0.03); border-radius:12px; padding:16px 18px;
+  border-left:3px solid #fb923c;
+}
+.growth-path .gp-head {
+  display:flex; align-items:center; gap:10px; margin-bottom:8px;
+}
+.gp-num {
+  flex-shrink:0; width:26px; height:26px; border-radius:50%;
+  background:rgba(251,146,60,0.2); color:#fb923c;
+  display:flex; align-items:center; justify-content:center;
+  font-size:0.8em; font-weight:700;
+}
+.gp-dim-label {
+  font-size:0.72em; color:#fb923c; padding:2px 8px;
+  background:rgba(251,146,60,0.1); border-radius:4px;
+  margin-right:8px; font-weight:500;
+}
+.gp-title { font-size:0.95em; font-weight:600; color:#fff; flex:1; }
+.gp-method { font-size:0.85em; color:#bbb; line-height:1.7; margin-bottom:8px; }
+.gp-action {
+  font-size:0.82em; color:#fb923c;
+  padding:8px 12px; background:rgba(251,146,60,0.08);
+  border-radius:8px; line-height:1.6;
+}
+.gp-action::before { content:"📌 立即行动： "; font-weight:600; }
+
+.result-actions {
+  display:flex; gap:14px; justify-content:center; margin-top:50px;
+}
+
+/* ========================= v3 新增：训练计划 & 打卡 ========================= */
+.plan-wrap, .checkin-wrap { max-width:960px; margin:0 auto; padding:30px; }
+
+/* 计划确认页 */
+.plan-intro-card {
+  background:linear-gradient(135deg, rgba(251,146,60,0.12) 0%, rgba(251,146,60,0.03) 100%);
+  border:1px solid rgba(251,146,60,0.3); border-radius:20px;
+  padding:28px; margin-bottom:30px;
+}
+.plan-intro-card .plan-tag {
+  display:inline-block; padding:4px 12px; background:rgba(251,146,60,0.2);
+  border-radius:980px; font-size:0.78em; color:#fb923c; margin-bottom:12px; letter-spacing:1px;
+}
+.plan-intro-card h2 {
+  font-size:1.6em; font-weight:600; margin-bottom:10px;
+  background: linear-gradient(135deg, #fff 0%, #bbb 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.plan-intro-card p { color:#bbb; font-size:0.95em; line-height:1.8; }
+
+.plan-section {
+  background:#0f0f0f; border:1px solid #1f1f1f;
+  border-radius:18px; padding:24px; margin-bottom:20px;
+}
+.plan-section h3 {
+  font-size:1.05em; font-weight:600; margin-bottom:6px; color:#fff;
+}
+.plan-section .plan-hint { font-size:0.82em; color:#888; margin-bottom:16px; }
+
+/* 任务勾选列表 */
+.plan-tasks { display:flex; flex-direction:column; gap:10px; }
+.plan-task {
+  background:#1a1a1a; border:2px solid #222; border-radius:12px;
+  padding:16px 18px; cursor:pointer; transition: all 0.25s ease;
+  display:flex; align-items:flex-start; gap:14px;
+}
+.plan-task:hover { border-color:#333; }
+.plan-task.picked { border-color:#fb923c; background:rgba(251,146,60,0.05); }
+.plan-task .tk-check {
+  flex-shrink:0; width:22px; height:22px; border-radius:50%;
+  border:2px solid #444; margin-top:2px;
+  display:flex; align-items:center; justify-content:center;
+  transition: all 0.2s ease;
+}
+.plan-task.picked .tk-check {
+  background:#fb923c; border-color:#fb923c; color:#000; font-weight:700; font-size:0.85em;
+}
+.plan-task.picked .tk-check::before { content:"✓"; }
+.plan-task .tk-body { flex:1; }
+.plan-task .tk-dim-label {
+  font-size:0.7em; color:#fb923c; padding:2px 8px; background:rgba(251,146,60,0.1);
+  border-radius:4px; margin-right:8px; font-weight:500; vertical-align:middle;
+}
+.plan-task .tk-title { font-size:0.97em; font-weight:600; color:#fff; display:inline; }
+.plan-task .tk-action {
+  font-size:0.82em; color:#aaa; line-height:1.6; margin-top:8px;
+}
+
+/* 周期选择 */
+.duration-options { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.duration-option {
+  background:#1a1a1a; border:2px solid #222; border-radius:14px;
+  padding:20px; text-align:center; cursor:pointer; transition: all 0.2s ease;
+}
+.duration-option:hover { border-color:#333; }
+.duration-option.selected { border-color:#fb923c; background:rgba(251,146,60,0.05); }
+.duration-option .dur-num {
+  font-size:2em; font-weight:700; color:#fb923c; margin-bottom:4px;
+}
+.duration-option .dur-label { font-size:0.85em; color:#aaa; margin-bottom:6px; }
+.duration-option .dur-desc { font-size:0.75em; color:#666; line-height:1.5; }
+
+/* 计划名称输入 */
+.plan-name-input {
+  width:100%; padding:14px 18px; background:#1a1a1a; border:1px solid #222;
+  border-radius:12px; color:#fff; font-size:1em; font-family:inherit;
+  transition: all 0.2s ease;
+}
+.plan-name-input:focus { outline:none; border-color:#fb923c; }
+
+/* 计划预览 */
+.plan-preview {
+  background:#0f0f0f; border:1px solid #1f1f1f; border-radius:18px;
+  padding:24px; margin-top:10px;
+}
+.plan-preview h4 { font-size:1em; color:#fff; margin-bottom:14px; }
+.plan-preview-row {
+  display:flex; justify-content:space-between; padding:10px 0;
+  border-bottom:1px dashed #1f1f1f; font-size:0.9em;
+}
+.plan-preview-row:last-child { border-bottom:none; }
+.plan-preview-row .lbl { color:#888; }
+.plan-preview-row .val { color:#fff; font-weight:500; }
+
+/* =========== 打卡中心 =========== */
+.checkin-header {
+  display:flex; justify-content:space-between; align-items:center;
+  background:linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%);
+  border:1px solid #2a2a2a; border-radius:20px;
+  padding:26px 28px; margin-bottom:20px;
+}
+.ch-left h2 {
+  font-size:1.5em; font-weight:600; margin-bottom:6px;
+  background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.ch-left .ch-sub { font-size:0.85em; color:#888; }
+.ch-stats { display:flex; gap:24px; }
+.ch-stat .n {
+  font-size:2em; font-weight:700;
+  background: linear-gradient(135deg, #fb923c, #fbbf24);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  line-height:1;
+}
+.ch-stat .l { font-size:0.75em; color:#888; margin-top:4px; }
+
+/* 进度条 */
+.ch-progress {
+  background:#0f0f0f; border:1px solid #1f1f1f; border-radius:14px;
+  padding:18px 22px; margin-bottom:20px;
+}
+.ch-progress-head {
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;
+  font-size:0.9em;
+}
+.ch-progress-head .prog-label { color:#ccc; }
+.ch-progress-head .prog-val { color:#fb923c; font-weight:600; }
+.ch-progress-bar {
+  height:8px; background:rgba(255,255,255,0.06); border-radius:4px; overflow:hidden;
+}
+.ch-progress-bar .fill {
+  height:100%; background:linear-gradient(90deg, #fb923c, #fbbf24);
+  border-radius:4px; transition: width 0.6s ease;
+}
+
+/* 日历网格 */
+.ch-calendar {
+  background:#0f0f0f; border:1px solid #1f1f1f; border-radius:18px;
+  padding:22px; margin-bottom:20px;
+}
+.ch-calendar h3 { font-size:1em; color:#fff; margin-bottom:14px; }
+.ch-cal-grid {
+  display:grid; grid-template-columns:repeat(7, 1fr); gap:8px;
+}
+.ch-day {
+  aspect-ratio:1; background:#1a1a1a; border:1px solid #222;
+  border-radius:10px; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  font-size:0.78em; color:#666; cursor:pointer;
+  transition: all 0.2s ease;
+}
+.ch-day .d-num { font-size:1.05em; font-weight:600; color:#ccc; }
+.ch-day.today { border-color:#fb923c; }
+.ch-day.done {
+  background:rgba(74,222,128,0.1); border-color:#4ade80;
+}
+.ch-day.done .d-num { color:#4ade80; }
+.ch-day.done::after { content:"✓"; font-size:0.9em; color:#4ade80; font-weight:700; }
+.ch-day.future { opacity:0.3; cursor:not-allowed; }
+.ch-day.missed {
+  opacity:0.4; background:rgba(248,113,113,0.06);
+}
+.ch-day.missed .d-num { color:#f87171; }
+
+/* 今日任务 */
+.ch-today-card {
+  background:linear-gradient(135deg, rgba(251,146,60,0.08) 0%, rgba(251,146,60,0.02) 100%);
+  border:1px solid rgba(251,146,60,0.3); border-radius:18px;
+  padding:24px; margin-bottom:20px;
+}
+.ch-today-card .today-head {
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;
+}
+.ch-today-card .today-title { font-size:1.1em; font-weight:600; color:#fff; }
+.ch-today-card .today-date {
+  font-size:0.82em; color:#fb923c;
+  padding:4px 12px; background:rgba(251,146,60,0.12); border-radius:980px;
+}
+
+.today-task {
+  background:rgba(255,255,255,0.04); border-radius:12px; padding:16px;
+  margin-bottom:10px; border-left:3px solid #fb923c;
+}
+.today-task .tt-head {
+  display:flex; align-items:center; gap:10px; margin-bottom:8px;
+}
+.today-task .tt-dim {
+  font-size:0.72em; color:#fb923c; padding:2px 8px;
+  background:rgba(251,146,60,0.1); border-radius:4px; font-weight:500;
+}
+.today-task .tt-title { font-size:0.95em; font-weight:600; color:#fff; flex:1; }
+.today-task .tt-action {
+  font-size:0.85em; color:#bbb; line-height:1.7; margin-bottom:10px;
+}
+.today-task textarea {
+  width:100%; min-height:60px; padding:10px 12px;
+  background:#0a0a0a; border:1px solid #222; border-radius:10px;
+  color:#fff; font-family:inherit; font-size:0.85em; resize:vertical;
+}
+.today-task textarea:focus { outline:none; border-color:#fb923c; }
+.today-task .tt-footer {
+  display:flex; justify-content:space-between; align-items:center; margin-top:10px;
+}
+.today-task .btn-checkin {
+  padding:8px 20px; background:#fb923c; color:#000;
+  border:none; border-radius:980px; font-size:0.85em;
+  font-weight:600; cursor:pointer; transition: all 0.2s ease;
+}
+.today-task .btn-checkin:hover { background:#fbbf24; }
+.today-task.done {
+  background:rgba(74,222,128,0.06); border-left-color:#4ade80;
+}
+.today-task.done .btn-checkin {
+  background:#4ade80; pointer-events:none;
+}
+.today-task.done .btn-checkin::before { content:"✓ 已打卡  "; }
+
+/* 历史反思 */
+.ch-history {
+  background:#0f0f0f; border:1px solid #1f1f1f; border-radius:18px;
+  padding:22px;
+}
+.ch-history h3 { font-size:1em; color:#fff; margin-bottom:14px; }
+.history-item {
+  padding:12px 0; border-bottom:1px solid #1a1a1a;
+  display:flex; gap:14px; align-items:flex-start;
+}
+.history-item:last-child { border-bottom:none; }
+.history-item .h-date {
+  flex-shrink:0; font-size:0.78em; color:#888;
+  padding:4px 10px; background:rgba(255,255,255,0.04);
+  border-radius:6px; white-space:nowrap;
+}
+.history-item .h-content { flex:1; font-size:0.88em; color:#bbb; line-height:1.7; }
+.history-item .h-content .h-task-name { color:#fff; font-weight:500; }
+.history-item .h-content .h-reflect {
+  margin-top:4px; color:#999; font-size:0.85em; font-style:italic;
+}
+
+.empty-state {
+  text-align:center; padding:30px 20px; color:#666; font-size:0.9em;
+}
+
+/* 通用操作栏 */
+.plan-footer {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:24px 0 10px;
+}
+.plan-footer .footer-hint { color:#666; font-size:0.88em; }
+
+@media (max-width:1024px) {
+  .style-grid, .result-grid { grid-template-columns:1fr; }
+  .style-preview { position:static; }
+  .mvp-features { grid-template-columns:repeat(2,1fr); }
+}
+@media (max-width:768px) {
+  .direction-grid, .scenario-cards { grid-template-columns:1fr; }
+  .user-match { grid-template-columns:1fr; }
+  .match-divider { display:none; }
+  .mvp-features { grid-template-columns:1fr; }
+  .color-options { grid-template-columns:repeat(2,1fr); }
+}
+
+/* 即时反馈Toast */
+.taste-toast {
+  position:fixed; bottom:30px; left:50%; transform:translateX(-50%) translateY(100px);
+  background:#1a1a1a; border:1px solid #2a2a2a; border-radius:14px;
+  padding:16px 24px; max-width:500px;
+  box-shadow:0 10px 40px rgba(0,0,0,0.5);
+  opacity:0; transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index:1000;
+}
+.taste-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.taste-toast .label {
+  font-size:0.75em; color:#888; margin-bottom:4px; letter-spacing:1px;
+}
+.taste-toast .text { font-size:0.92em; color:#fff; line-height:1.5; }
+</style>
+</head>
+<body>
+
+<!-- ============ 第一幕：欢迎入场 ============ -->
+<div class="scene active" id="scene-welcome">
+  <div class="welcome-tag">PRODUCT TASTE WORKSHOP</div>
+  <h1 class="welcome-title">Taste工坊</h1>
+  <p class="welcome-subtitle">120秒，亲手搭建一个属于你的产品<br>在这个过程中，发现你的隐形产品Taste</p>
+
+  <div class="welcome-highlights">
+    <div class="highlight-card">
+      <div class="highlight-num">01</div>
+      <div class="highlight-title">不是答题</div>
+      <div class="highlight-desc">真实地搭建产品。每一步选择都会改变最终形态，看到自己亲手做的成果。</div>
+    </div>
+    <div class="highlight-card">
+      <div class="highlight-num">02</div>
+      <div class="highlight-title">没有标准答案</div>
+      <div class="highlight-desc">你的每个选择都没有对错，但都暴露了你的产品直觉。这就是Taste。</div>
+    </div>
+    <div class="highlight-card">
+      <div class="highlight-num">03</div>
+      <div class="highlight-title">有惊喜的反馈</div>
+      <div class="highlight-desc">完成后会得到属于你的产品人格画像，看看你和哪些真实产品思路相近。</div>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="goScene('direction')">开始搭建你的产品 →</button>
+</div>
+
+<!-- ============ 第二幕：定方向 ============ -->
+<div class="scene" id="scene-direction">
+  <div class="scene-header">
+    <div class="scene-step">
+      <span class="step-dot current"></span>
+      <span class="step-dot"></span>
+      <span class="step-dot"></span>
+      <span class="step-dot"></span>
+      <span class="step-dot"></span>
+      <span style="margin-left:10px;">第 1 / 5 步 · 定方向</span>
+    </div>
+    <button class="btn-ghost" onclick="goScene('welcome')">返回</button>
+  </div>
+
+  <div class="scene-title-area">
+    <h2 class="scene-title">想做一个什么产品？</h2>
+    <p class="scene-desc">选择一个产品方向 + 你想服务的用户群。这两个选择决定了你产品的"灵魂"。</p>
+  </div>
+
+  <div class="scene-body">
+    <h4 style="margin-bottom:14px; font-size:1em; color:#aaa;">① 产品方向（单选）</h4>
+    <div class="direction-grid" id="directionGrid">
+      <div class="direction-card" data-id="tool" onclick="pickDirection(this,'tool')">
+        <h3>工具型产品<span class="check"></span></h3>
+        <p>解决具体问题、提升效率。用户用完即走，价值在"好用"。</p>
+        <div class="examples">代表：滴答清单 / Keep / 计算器</div>
+      </div>
+      <div class="direction-card" data-id="content" onclick="pickDirection(this,'content')">
+        <h3>内容型产品<span class="check"></span></h3>
+        <p>提供优质内容，让用户消费、学习、成长。价值在"内容质量"。</p>
+        <div class="examples">代表：得到 / B站 / 小红书</div>
+      </div>
+      <div class="direction-card" data-id="social" onclick="pickDirection(this,'social')">
+        <h3>社交型产品<span class="check"></span></h3>
+        <p>连接人与人，建立关系网络。价值在"用户活跃度"。</p>
+        <div class="examples">代表：微信 / 即刻 / Soul</div>
+      </div>
+      <div class="direction-card" data-id="business" onclick="pickDirection(this,'business')">
+        <h3>商业型产品<span class="check"></span></h3>
+        <p>促进交易，连接供需双方。价值在"GMV和转化率"。</p>
+        <div class="examples">代表：淘宝 / 美团 / 闲鱼</div>
+      </div>
+    </div>
+
+    <h4 style="margin-top:50px; margin-bottom:14px; font-size:1em; color:#aaa;">② 选择你的服务对象</h4>
+    <div class="user-pick-grid" id="userPickGrid">
+      <div class="user-pick-card" data-id="L1" onclick="pickUser(this,'L1')">
+        <div class="up-emoji">🎓</div>
+        <div class="up-name">大学生</div>
+        <div class="up-tag">18-22岁 · 探索期</div>
+      </div>
+      <div class="user-pick-card" data-id="L2" onclick="pickUser(this,'L2')">
+        <div class="up-emoji">💼</div>
+        <div class="up-name">职场新人</div>
+        <div class="up-tag">22-28岁 · 上升期</div>
+      </div>
+      <div class="user-pick-card" data-id="L3" onclick="pickUser(this,'L3')">
+        <div class="up-emoji">🏠</div>
+        <div class="up-name">中年职场</div>
+        <div class="up-tag">28-45岁 · 沉淀期</div>
+      </div>
+      <div class="user-pick-card" data-id="L4" onclick="pickUser(this,'L4')">
+        <div class="up-emoji">👴</div>
+        <div class="up-name">银发用户</div>
+        <div class="up-tag">55+岁 · 慢节奏</div>
+      </div>
+    </div>
+
+    <!-- 需求洞察排序：选了服务对象后才显示 -->
+    <div class="needs-rank-section" id="needsRankSection" style="display:none;">
+      <div class="needs-head">
+        <h4 id="needsRankTitle">他们最看重什么？</h4>
+        <p class="needs-hint">为<span id="userPickedName">该用户</span>真正的核心需求排序——把最关键的拖到最上面。这反映了你对TA的理解深度。</p>
+      </div>
+      <div class="needs-list" id="needsList">
+        <!-- 动态渲染 -->
+      </div>
+      <div class="needs-tip" id="needsTip" style="display:none;">
+        <!-- 排序后的Taste解读 -->
+      </div>
+    </div>
+  </div>
+
+  <div class="scene-footer">
+    <span style="color:#666; font-size:0.9em;" id="directionStatus">请完成两项选择</span>
+    <button class="btn-primary" id="btnDirectionNext" disabled onclick="goScene('background')">下一步 →</button>
+  </div>
+</div>
+
+<!-- ============ 第三幕：定背景 ============ -->
+<div class="scene" id="scene-background">
+  <div class="scene-header">
+    <div class="scene-step">
+      <span class="step-dot done"></span>
+      <span class="step-dot current"></span>
+      <span class="step-dot"></span>
+      <span class="step-dot"></span>
+      <span class="step-dot"></span>
+      <span style="margin-left:10px;">第 2 / 5 步 · 定背景</span>
+    </div>
+    <button class="btn-ghost" onclick="goScene('direction')">返回</button>
+  </div>
+
+  <div class="scene-title-area">
+    <h2 class="scene-title">用户在什么场景下用？</h2>
+    <p class="scene-desc">想清楚使用场景和核心痛点，是产品有没有"灵魂"的关键。</p>
+  </div>
+
+  <div class="scene-body">
+    <h4 style="margin-bottom:14px; font-size:1em; color:#aaa;">① 核心使用场景（单选）</h4>
+    <div class="scenario-cards" id="scenarioCards">
+      <div class="scenario-card" data-id="commute" onclick="pickScenario(this,'commute')">
+        <div class="time">7:30 AM · 通勤路上</div>
+        <h3>地铁里的15分钟</h3>
+        <p>一只手操作、注意力被打断、需要轻量化体验</p>
+      </div>
+      <div class="scenario-card" data-id="weekend" onclick="pickScenario(this,'weekend')">
+        <div class="time">SAT 3:00 PM · 周末下午</div>
+        <h3>悠闲的下午茶时光</h3>
+        <p>有大段时间、深度沉浸、愿意投入</p>
+      </div>
+      <div class="scenario-card" data-id="bedtime" onclick="pickScenario(this,'bedtime')">
+        <div class="time">10:30 PM · 睡前1小时</div>
+        <h3>放松的睡前时刻</h3>
+        <p>放松状态、追求愉悦感、避免高强度信息</p>
+      </div>
+    </div>
+
+    <div class="painpoint-section">
+      <h4>② 用户最在意什么？（拖拽排序，最重要的放最上面）</h4>
+      <p class="hint">拖动条目调整顺序，第一名将被高亮为"核心痛点"</p>
+      <div class="painpoint-list" id="painpointList">
+        <div class="painpoint-item" draggable="true" data-id="p1">
+          <span class="painpoint-rank">1</span>
+          <span class="painpoint-text">没时间，操作必须快</span>
+          <span class="painpoint-handle">≡</span>
+        </div>
+        <div class="painpoint-item" draggable="true" data-id="p2">
+          <span class="painpoint-rank">2</span>
+          <span class="painpoint-text">没动力，需要持续激励</span>
+          <span class="painpoint-handle">≡</span>
+        </div>
+        <div class="painpoint-item" draggable="true" data-id="p3">
+          <span class="painpoint-rank">3</span>
+          <span class="painpoint-text">不知道怎么开始，需要引导</span>
+          <span class="painpoint-handle">≡</span>
+        </div>
+        <div class="painpoint-item" draggable="true" data-id="p4">
+          <span class="painpoint-rank">4</span>
+          <span class="painpoint-text">觉得太复杂，需要简化</span>
+          <span class="painpoint-handle">≡</span>
+        </div>
+        <div class="painpoint-item" draggable="true" data-id="p5">
+          <span class="painpoint-rank">5</span>
+          <span class="painpoint-text">找不到同伴，需要社交</span>
+          <span class="painpoint-handle">≡</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene-footer">
+    <span style="color:#666; font-size:0.9em;" id="bgStatus">请选择一个场景</span>
+    <button class="btn-primary" id="btnBgNext" disabled onclick="goScene('mvp')">下一步 →</button>
+  </div>
+</div>
+
+<!-- ============ 第四幕：搭MVP（10选3） ============ -->
+<div class="scene" id="scene-mvp">
+  <div class="scene-header">
+    <div class="scene-step">
+      <span class="step-dot done"></span>
+      <span class="step-dot done"></span>
+      <span class="step-dot current"></span>
+      <span class="step-dot"></span>
+      <span class="step-dot"></span>
+      <span style="margin-left:10px;">第 3 / 5 步 · 搭MVP</span>
+    </div>
+    <button class="btn-ghost" onclick="goScene('background')">返回</button>
+  </div>
+
+  <div class="scene-title-area">
+    <h2 class="scene-title">从10个里挑出你的MVP核心</h2>
+    <p class="scene-desc">真实的产品MVP往往只有 1-3 个核心功能。请你保留最关键的、划掉不必要的——你也可以再次点击切换状态。<br>「保留」和「划掉」的判断之间，藏着你最真实的Taste。</p>
+  </div>
+
+  <div class="scene-body">
+    <div class="mvp-stats">
+      <div class="mvp-stat-item success">
+        <span class="num" id="keptCount">0</span>
+        <span class="label">已保留 (1-3 个)</span>
+      </div>
+      <div class="mvp-stat-item">
+        <span class="num" id="cutCount">0</span>
+        <span class="label">已划掉</span>
+      </div>
+      <div class="mvp-stat-item warning">
+        <span class="num" id="totalLeft">10</span>
+        <span class="label">未决定</span>
+      </div>
+    </div>
+
+    <div class="mvp-features" id="mvpFeatures">
+      <div class="feature-card" data-id="f1">
+        <span class="feat-state"></span>
+        <div class="feat-name">个人主页</div>
+        <div class="feat-desc">展示用户头像、昵称、简介、动态</div>
+        <div class="feat-buttons">
+          <button class="feat-btn keep-btn" onclick="setFeature('f1','kept')">保留</button>
+          <button class="feat-btn cut-btn" onclick="setFeature('f1','removed')">划掉</button>
+        </div>
+      </div>
+      <div class="feature-card" data-id="f2">
+        <span class="feat-state"></span>
+        <div class="feat-name">数据统计</div>
+        <div class="feat-desc">用图表展示用户的使用数据和趋势</div>
+        <div class="feat-buttons">
+          <button class="feat-btn keep-btn" onclick="setFeature('f2','kept')">保留</button>
+          <button class="feat-btn cut-btn" onclick="setFeature('f2','removed')">划掉</button>
+        </div>
+      </div>
+      <div class="feature-card" data-id="f3">
+        <span class="feat-state"></span>
+        <div class="feat-name">社交动态</div>
+        <div class="feat-desc">朋友圈式的内容分享和互动</div>
+        <div class="feat-buttons">
+          <button class="feat-btn keep-btn" onclick="setFeature('f3','kept')">保留</button>
+          <button class="feat-btn cut-btn" onclick="setFeature('f3','removed')">划掉</button>
+        </div>
+      </div>
+      <div class="feature-card" data-id="f4">
+        <span class="feat-state"></span>
+        <div class="feat-name">内容推荐</div>
+        <div class="feat-desc">基于算法的个性化内容推荐</div>
+        <div class="feat-buttons">
+          <button class="feat-btn keep-btn" onclick="setFeature('f4','kept')">保留</button>
+          <button class="feat-btn cut-btn" onclick="setFeature('f4','removed')">划掉</button>
+        </div>
+      </div>
+      <div class="feature-card" data-id="f5">
+        <span class="feat-state"></span>
+        <div class="feat-name">课程/任务系统</div>
+        <div class="feat-desc">系统化的学习路径或任务清单</div>
+        <div class="feat-buttons">
+          <button class="feat-btn keep-btn" onclick="setFeature('f5','kept')">保留</button>
+          <button class="feat-btn cut-btn" onclick="setFeature('f5','removed')">划掉</button>
+        </div>
+      </div>
+      <div class="feature-card" data-id="f6">
+        <span class="feat-state"></span>
+        <div class="feat-name">排行榜</div>
+        <div class="feat-desc">用户间的竞争和荣誉感激励</div>
+        <div class="feat-buttons">
+          <button class="feat-btn keep-btn" onclick="setFeature('f6','kept')">保留</button>
+          <button class="feat-btn cut-btn" onclick="setFeature('f6','removed')">划掉</button>
+        </div>
+      </div>
+      <div class="feature-card" data-id="f7">
+        <span class="feat-state"></span>
+        <div class="feat-name">收藏夹</div>
+        <div class="feat-desc">让用户保存喜欢的内容方便回看</div>
+        <div class="feat-buttons">
+          <button class="feat-btn keep-btn" onclick="setFeature('f7','kept')">保留</button>
+          <button class="feat-btn cut-btn" onclick="setFeature('f7','removed')">划掉</button>
+        </div>
+      </div>
+      <div class="feature-card" data-id="f8">
+        <span class="feat-state"></span>
+        <div class="feat-name">通知系统</div>
+        <div class="feat-desc">提醒用户重要事件和更新</div>
+        <div class="feat-buttons">
+          <button class="feat-btn keep-btn" onclick="setFeature('f8','kept')">保留</button>
+          <button class="feat-btn cut-btn" onclick="setFeature('f8','removed')">划掉</button>
+        </div>
+      </div>
+      <div class="feature-card" data-id="f9">
+        <span class="feat-state"></span>
+        <div class="feat-name">搜索</div>
+        <div class="feat-desc">让用户主动找到想要的内容</div>
+        <div class="feat-buttons">
+          <button class="feat-btn keep-btn" onclick="setFeature('f9','kept')">保留</button>
+          <button class="feat-btn cut-btn" onclick="setFeature('f9','removed')">划掉</button>
+        </div>
+      </div>
+      <div class="feature-card" data-id="f10">
+        <span class="feat-state"></span>
+        <div class="feat-name">评论互动</div>
+        <div class="feat-desc">用户之间的留言、点赞、回复</div>
+        <div class="feat-buttons">
+          <button class="feat-btn keep-btn" onclick="setFeature('f10','kept')">保留</button>
+          <button class="feat-btn cut-btn" onclick="setFeature('f10','removed')">划掉</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mvp-help">
+      <h5>关于MVP的小Tips</h5>
+      <p>真实的产品MVP往往只有 1-3 个核心功能。多了就是"我什么都想做"——这恰恰是没有Taste的表现。<br>乔布斯：「决定不做什么和决定做什么同样重要。」每一次按下「划掉」，都是一次Taste的觉醒。</p>
+    </div>
+  </div>
+
+  <div class="scene-footer">
+    <span style="color:#666; font-size:0.9em;" id="mvpStatus">至少保留 1 个核心功能即可继续</span>
+    <button class="btn-primary" id="btnMvpNext" disabled onclick="goScene('style')">下一步 →</button>
+  </div>
+</div>
+
+<!-- ============ 第五幕：定风格（v3.2 升级 — 微信哲学 + 写实手机） ============ -->
+<div class="scene" id="scene-style">
+  <div class="scene-header">
+    <div class="scene-step">
+      <span class="step-dot done"></span>
+      <span class="step-dot done"></span>
+      <span class="step-dot done"></span>
+      <span class="step-dot current"></span>
+      <span class="step-dot"></span>
+      <span style="margin-left:10px;">第 4 / 5 步 · 定风格 · 微信哲学</span>
+    </div>
+    <button class="btn-ghost" onclick="goScene('mvp')">返回</button>
+  </div>
+
+  <div class="scene-title-area">
+    <h2 class="scene-title">给你的产品定个调子</h2>
+    <p class="scene-desc">每一个细节都体现产品哲学。下面的选择参考了张小龙的微信产品价值观——你的每个决策，都在塑造产品的气质。<br>右边的手机预览会实时反映你的选择。</p>
+  </div>
+
+  <div class="scene-body">
+    <div class="style-grid">
+      <div class="style-controls">
+
+        <!-- ① 主色调 -->
+        <div class="style-section">
+          <h4>① 主色调</h4>
+          <p class="style-hint">产品的视觉性格——克制还是张扬？</p>
+          <div class="color-options" id="colorOptions">
+            <div class="color-option selected" data-id="c1" data-bg="linear-gradient(135deg,#1a1a1a,#444)" data-name="极简黑白" onclick="pickColor(this)">
+              <div style="width:100%; height:100%; background:linear-gradient(135deg,#1a1a1a,#444);"></div>
+              <span class="label">极简黑白</span>
+            </div>
+            <div class="color-option" data-id="c5" data-bg="linear-gradient(135deg,#07c160,#06ad56)" data-name="微信绿" onclick="pickColor(this)">
+              <div style="width:100%; height:100%; background:linear-gradient(135deg,#07c160,#06ad56);"></div>
+              <span class="label">微信绿</span>
+            </div>
+            <div class="color-option" data-id="c2" data-bg="linear-gradient(135deg,#667eea,#764ba2)" data-name="活力渐变" onclick="pickColor(this)">
+              <div style="width:100%; height:100%; background:linear-gradient(135deg,#667eea,#764ba2);"></div>
+              <span class="label">活力渐变</span>
+            </div>
+            <div class="color-option" data-id="c3" data-bg="linear-gradient(135deg,#fbbf24,#f87171)" data-name="温暖橙红" onclick="pickColor(this)">
+              <div style="width:100%; height:100%; background:linear-gradient(135deg,#fbbf24,#f87171);"></div>
+              <span class="label">温暖橙红</span>
+            </div>
+            <div class="color-option" data-id="c4" data-bg="linear-gradient(135deg,#0f172a,#1e3a8a)" data-name="商务深蓝" onclick="pickColor(this)">
+              <div style="width:100%; height:100%; background:linear-gradient(135deg,#0f172a,#1e3a8a);"></div>
+              <span class="label">商务深蓝</span>
+            </div>
+            <div class="color-option" data-id="c6" data-bg="linear-gradient(135deg,#fde68a,#fef3c7)" data-name="柔和米色" onclick="pickColor(this)">
+              <div style="width:100%; height:100%; background:linear-gradient(135deg,#fde68a,#fef3c7);"></div>
+              <span class="label" style="color:#000; text-shadow:none;">柔和米色</span>
+            </div>
+          </div>
+          <div class="philosophy-note" id="colorPhi" style="display:none;">
+            <span class="phi-tag">微信观</span>
+            <span id="colorPhiText"></span>
+          </div>
+        </div>
+
+        <!-- ② 品牌名 -->
+        <div class="style-section">
+          <h4>② 你的产品叫什么名字？</h4>
+          <p class="style-hint">名字会出现在Logo和顶部——好名字简短、易记、有性格</p>
+          <input class="brand-input" id="brandNameInput" placeholder="给你的产品起个名字（2-8字）" maxlength="10" value="同行">
+        </div>
+
+        <!-- ③ 品牌Slogan -->
+        <div class="style-section">
+          <h4>③ 一句话Slogan</h4>
+          <p class="style-hint">用户第一眼看到的产品主张——克制比花哨更难</p>
+          <div class="copy-options" id="sloganOptions">
+            <div class="copy-option selected" data-id="sl1" data-text="一种生活方式" onclick="pickSlogan(this)">"一种生活方式" — 微信式克制</div>
+            <div class="copy-option" data-id="sl2" data-text="让每一天都更高效" onclick="pickSlogan(this)">"让每一天都更高效" — 价值直白</div>
+            <div class="copy-option" data-id="sl3" data-text="发现更好的自己" onclick="pickSlogan(this)">"发现更好的自己" — 情感激励</div>
+            <div class="copy-option" data-id="sl4" data-text="(无 Slogan)" onclick="pickSlogan(this)">不加 Slogan — 真极简，留白即语言</div>
+          </div>
+        </div>
+
+        <!-- ④ 欢迎语风格 -->
+        <div class="style-section">
+          <h4>④ 首屏欢迎语</h4>
+          <p class="style-hint">用户每次打开看到的第一句话</p>
+          <div class="copy-options" id="copyOptions">
+            <div class="copy-option selected" data-id="cp1" data-text="欢迎回来" onclick="pickCopy(this)">"欢迎回来" — 温暖亲切（微信登录页用过）</div>
+            <div class="copy-option" data-id="cp2" data-text="Hi，准备好了吗" onclick="pickCopy(this)">"Hi，准备好了吗" — 活力激励</div>
+            <div class="copy-option" data-id="cp3" data-text="登录到账户" onclick="pickCopy(this)">"登录到账户" — 直接专业</div>
+            <div class="copy-option" data-id="cp4" data-text="今天也要加油呀" onclick="pickCopy(this)">"今天也要加油呀" — 趣味陪伴</div>
+            <div class="copy-option" data-id="cp5" data-text="" onclick="pickCopy(this)">不写文案 — 微信主屏从无欢迎语</div>
+          </div>
+          <div class="philosophy-note" id="copyPhi" style="display:none;">
+            <span class="phi-tag">微信观</span>
+            <span id="copyPhiText"></span>
+          </div>
+        </div>
+
+        <!-- ⑤ 主行动按钮形状 -->
+        <div class="style-section">
+          <h4>⑤ 主行动按钮的形状</h4>
+          <p class="style-hint">圆角程度反映产品性格：方正=专业，圆滑=亲切</p>
+          <div class="comp-grid-4" id="btnShapeGrid">
+            <div class="comp-card" data-id="bs1" data-radius="0" onclick="pickBtnShape(this)">
+              <div class="btn-shape-preview" style="border-radius:0;">按钮</div>
+              <div class="c-name">直角</div>
+            </div>
+            <div class="comp-card selected" data-id="bs2" data-radius="8" onclick="pickBtnShape(this)">
+              <div class="btn-shape-preview" style="border-radius:8px;">按钮</div>
+              <div class="c-name">小圆角</div>
+            </div>
+            <div class="comp-card" data-id="bs3" data-radius="14" onclick="pickBtnShape(this)">
+              <div class="btn-shape-preview" style="border-radius:14px;">按钮</div>
+              <div class="c-name">大圆角</div>
+            </div>
+            <div class="comp-card" data-id="bs4" data-radius="999" onclick="pickBtnShape(this)">
+              <div class="btn-shape-preview" style="border-radius:999px;">按钮</div>
+              <div class="c-name">胶囊</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ⑥ 主行动按钮位置 -->
+        <div class="style-section">
+          <h4>⑥ 主行动按钮的位置</h4>
+          <p class="style-hint">不同位置传递不同的「行动召唤」力度</p>
+          <div class="comp-grid-3" id="btnPosGrid">
+            <div class="comp-card selected" data-pos="bottom" onclick="pickBtnPos(this)">
+              <div class="btn-pos-preview"></div>
+              <div class="c-name">底部固定</div>
+            </div>
+            <div class="comp-card" data-pos="float" onclick="pickBtnPos(this)">
+              <div class="btn-pos-preview"></div>
+              <div class="c-name">右下浮动</div>
+            </div>
+            <div class="comp-card" data-pos="inline" onclick="pickBtnPos(this)">
+              <div class="btn-pos-preview"></div>
+              <div class="c-name">内联随屏</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ⑦ 导航方式 -->
+        <div class="style-section">
+          <h4>⑦ 导航方式</h4>
+          <p class="style-hint">用户在App里如何切换页面 — 微信选了底部Tab</p>
+          <div class="comp-grid-3" id="navGrid">
+            <div class="comp-card selected" data-nav="bottom" onclick="pickNav(this)">
+              <div class="nav-preview"></div>
+              <div class="c-name">底部Tab</div>
+            </div>
+            <div class="comp-card" data-nav="top" onclick="pickNav(this)">
+              <div class="nav-preview"></div>
+              <div class="c-name">顶部Tab</div>
+            </div>
+            <div class="comp-card" data-nav="drawer" onclick="pickNav(this)">
+              <div class="nav-preview"></div>
+              <div class="c-name">侧边抽屉</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ⑧ 卡片圆角 -->
+        <div class="style-section">
+          <h4>⑧ 内容卡片圆角</h4>
+          <p class="style-hint">细节决定气质</p>
+          <div class="comp-grid-4" id="radiusGrid">
+            <div class="comp-card" data-id="r1" data-r="0" onclick="pickRadius(this)">
+              <div class="radius-preview"></div>
+              <div class="c-name">硬朗</div>
+            </div>
+            <div class="comp-card" data-id="r2" data-r="6" onclick="pickRadius(this)">
+              <div class="radius-preview"></div>
+              <div class="c-name">克制</div>
+            </div>
+            <div class="comp-card selected" data-id="r3" data-r="14" onclick="pickRadius(this)">
+              <div class="radius-preview"></div>
+              <div class="c-name">柔和</div>
+            </div>
+            <div class="comp-card" data-id="r4" data-r="50" onclick="pickRadius(this)">
+              <div class="radius-preview"></div>
+              <div class="c-name">极致圆润</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ⑨ 视觉密度 -->
+        <div class="style-section">
+          <h4>⑨ 视觉密度</h4>
+          <p class="style-hint">信息呈现的疏密程度</p>
+          <div class="copy-options" id="densityOptions">
+            <div class="copy-option selected" data-id="d1" data-density="loose" onclick="pickDensity(this)">疏 · 大量留白，专注一件事</div>
+            <div class="copy-option" data-id="d2" data-density="medium" onclick="pickDensity(this)">中 · 平衡的呼吸感</div>
+            <div class="copy-option" data-id="d3" data-density="dense" onclick="pickDensity(this)">密 · 一屏展示更多信息</div>
+          </div>
+        </div>
+
+        <!-- ⑩ 微信哲学：用户掌控权 -->
+        <div class="style-section philosophy-section">
+          <div class="phi-section-head">
+            <h4>⑩ 用户掌控权</h4>
+            <span class="phi-mini-tag">微信哲学</span>
+          </div>
+          <p class="style-hint">让用户做主，还是平台主导？这背后是产品价值观的根本分歧。</p>
+          <div class="copy-options" id="controlOptions">
+            <div class="copy-option selected" data-id="ctrl1" data-control="user" onclick="pickControl(this)">用户主权 · 让用户自己选要不要、看不看 — 微信式</div>
+            <div class="copy-option" data-id="ctrl2" data-control="balanced" onclick="pickControl(this)">平衡折中 · 默认推荐，但留出关闭口</div>
+            <div class="copy-option" data-id="ctrl3" data-control="platform" onclick="pickControl(this)">平台主导 · 算法决定一切，无需用户管</div>
+          </div>
+          <div class="philosophy-note" id="controlPhi" style="display:none;">
+            <span class="phi-tag">微信观</span>
+            <span id="controlPhiText"></span>
+          </div>
+        </div>
+
+        <!-- ⑪ 微信哲学：通知策略 -->
+        <div class="style-section philosophy-section">
+          <div class="phi-section-head">
+            <h4>⑪ 通知/提醒策略</h4>
+            <span class="phi-mini-tag">微信哲学</span>
+          </div>
+          <p class="style-hint">"用完即走"还是"想方设法把用户拉回来"？</p>
+          <div class="copy-options" id="notifyOptions">
+            <div class="copy-option selected" data-id="ntf1" data-notify="quiet" onclick="pickNotify(this)">克制 · 只在必要时打扰，不做"为了留存的提醒"</div>
+            <div class="copy-option" data-id="ntf2" data-notify="moderate" onclick="pickNotify(this)">适度 · 每日一两次，节奏感稳定</div>
+            <div class="copy-option" data-id="ntf3" data-notify="aggressive" onclick="pickNotify(this)">密集 · 红点 + 推送 + 强提醒，能拉回就拉</div>
+          </div>
+          <div class="philosophy-note" id="notifyPhi" style="display:none;">
+            <span class="phi-tag">微信观</span>
+            <span id="notifyPhiText"></span>
+          </div>
+        </div>
+
+        <!-- ⑫ 微信哲学：商业化露出 -->
+        <div class="style-section philosophy-section">
+          <div class="phi-section-head">
+            <h4>⑫ 商业化在产品里的位置</h4>
+            <span class="phi-mini-tag">微信哲学</span>
+          </div>
+          <p class="style-hint">微信广告只在朋友圈第5条出现一次 — 你的产品呢？</p>
+          <div class="copy-options" id="bizOptions">
+            <div class="copy-option selected" data-id="biz1" data-biz="hidden" onclick="pickBiz(this)">克制隐藏 · 商业内容深藏在二级页面，主流程不打扰</div>
+            <div class="copy-option" data-id="biz2" data-biz="contextual" onclick="pickBiz(this)">情境融入 · 在用户需要时出现，不在不需要时打扰</div>
+            <div class="copy-option" data-id="biz3" data-biz="prominent" onclick="pickBiz(this)">显眼直接 · 首屏展示推广，最大化曝光</div>
+          </div>
+          <div class="philosophy-note" id="bizPhi" style="display:none;">
+            <span class="phi-tag">微信观</span>
+            <span id="bizPhiText"></span>
+          </div>
+        </div>
+
+        <!-- ⑬ 空状态文案 -->
+        <div class="style-section">
+          <h4>⑬ 内容空状态文案</h4>
+          <p class="style-hint">当用户没有数据时显示什么？这是产品最容易被忽视的"温度时刻"。</p>
+          <div class="copy-options" id="emptyOptions">
+            <div class="copy-option selected" data-id="em1" data-text="还没有内容" onclick="pickEmpty(this)">"还没有内容" — 中性、克制</div>
+            <div class="copy-option" data-id="em2" data-text="试着开始第一步吧" onclick="pickEmpty(this)">"试着开始第一步吧" — 鼓励引导</div>
+            <div class="copy-option" data-id="em3" data-text="一片空白，刚好可以从头来过" onclick="pickEmpty(this)">"一片空白，刚好可以从头来过" — 文艺温暖</div>
+            <div class="copy-option" data-id="em4" data-text="暂无数据" onclick="pickEmpty(this)">"暂无数据" — 工程师风格（不推荐）</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ========== 写实手机预览 ========== -->
+      <div class="style-preview">
+        <div class="phone-frame realistic">
+          <!-- iPhone 刘海 -->
+          <div class="phone-notch"></div>
+          <div class="phone-display realistic" id="phoneDisplay">
+            <!-- 状态栏 -->
+            <div class="rl-status-bar">
+              <span class="rl-time">9:41</span>
+              <span class="rl-icons">
+                <span class="rl-signal">●●●</span>
+                <span class="rl-wifi">⌬</span>
+                <span class="rl-battery">▮</span>
+              </span>
+            </div>
+            <!-- 顶部品牌区 -->
+            <div class="rl-brand-bar" id="rlBrandBar">
+              <div class="rl-logo" id="rlLogo">同行</div>
+              <div class="rl-greeting" id="rlGreeting">欢迎回来</div>
+              <div class="rl-slogan" id="rlSlogan">一种生活方式</div>
+            </div>
+            <!-- 内容区域 -->
+            <div class="rl-content" id="rlContent">
+              <!-- 动态渲染 -->
+            </div>
+            <!-- 主行动按钮 -->
+            <div class="rl-main-btn" id="rlMainBtn">开始体验</div>
+            <!-- 底部导航 -->
+            <div class="rl-tabbar" id="rlTabBar">
+              <div class="rl-tab active"><span class="rl-tab-icon">●</span><span>首页</span></div>
+              <div class="rl-tab"><span class="rl-tab-icon">◇</span><span>发现</span></div>
+              <div class="rl-tab"><span class="rl-tab-icon">○</span><span>我的</span></div>
+            </div>
+          </div>
+        </div>
+        <p style="text-align:center; color:#666; font-size:0.85em; margin-top:14px;">↑ 实时预览 · 你搭建的产品长这样</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene-footer">
+    <span style="color:#666; font-size:0.9em;">七个维度·实时反映在右侧手机</span>
+    <button class="btn-primary" onclick="finish()">完成搭建，看看我的Taste画像 →</button>
+  </div>
+</div>
+
+<!-- ============ 第七幕：成果 + Taste画像 ============ -->
+<div class="scene" id="scene-result">
+  <div class="result-hero">
+    <div class="result-tag">YOUR PRODUCT TASTE PROFILE</div>
+    <h1 class="result-title" id="resultTitle">恭喜，你搭出来了一个产品</h1>
+    <p class="result-subtitle">基于你的全部选择，我们生成了你的产品Taste画像</p>
+  </div>
+
+  <div class="result-grid">
+    <div class="result-phone">
+      <div class="phone-frame">
+        <div class="phone-display" id="resultPhone">
+          <!-- 动态渲染 -->
+        </div>
+      </div>
+      <p style="text-align:center; color:#666; font-size:0.85em; margin-top:14px;">这就是你亲手搭建的产品</p>
+    </div>
+
+    <div class="result-info">
+      <div class="persona-card">
+        <div class="persona-label">你的产品人格</div>
+        <div class="persona-name" id="personaName">极简主义者</div>
+        <div class="persona-desc" id="personaDesc">你相信「少即是多」。在产品决策中，你倾向于做减法而非加法，重视用户的核心体验而非功能堆砌。</div>
+        <div class="persona-tags" id="personaTags"></div>
+      </div>
+
+      <div class="insights-card">
+        <h4>关于你的Taste的3个洞察</h4>
+        <div id="insightList">
+          <!-- 动态渲染 -->
+        </div>
+      </div>
+
+      <div class="similar-card">
+        <h4>你和这些真实产品的思路相似</h4>
+        <p>基于你的选择倾向，你的产品视角与下面这些产品的早期决策非常接近：</p>
+        <div class="similar-products" id="similarProducts">
+          <!-- 动态渲染 -->
+        </div>
+      </div>
+
+      <!-- v2新增：微信产品价值观对照 -->
+      <div class="wechat-card">
+        <span class="wc-tag">官方TASTE · 微信产品价值观</span>
+        <h4 id="wechatHeadline">和官方Taste对照看看</h4>
+        <p class="wc-intro" id="wechatIntro">微信对"什么是好产品"有一套独特的价值观。让我们看看你的选择和它们对照下：</p>
+        <div class="wechat-principles" id="wechatPrinciples">
+          <!-- 动态渲染 -->
+        </div>
+        <div class="wc-conclusion" id="wechatConclusion">
+          <!-- 动态渲染 -->
+        </div>
+      </div>
+
+      <!-- v2新增：相关产品故事/案例 -->
+      <div class="stories-card">
+        <h4>读这些产品故事，深化你的Taste</h4>
+        <p class="stories-hint">基于你的人格画像精选的真实产品故事</p>
+        <div id="storyList">
+          <!-- 动态渲染 -->
+        </div>
+      </div>
+
+      <!-- v2.1升级：Taste补短板建议（培训本质是补齐） -->
+      <div class="growth-card">
+        <span class="g-tag">TASTE GROWTH · 补短板建议</span>
+        <h4 id="growthHeadline">你的Taste五维画像</h4>
+        <p class="g-intro" id="growthIntro">Taste不是单一维度，而是五个维度的综合。你的强项已经足够闪亮，培训的真正价值在于——补齐那些被忽视的短板。这是基于你搭建决策诊断出的个人提升方向：</p>
+
+        <!-- 五维得分条 -->
+        <div class="taste-dims" id="tasteDims">
+          <!-- 动态渲染 -->
+        </div>
+
+        <!-- 短板总结 -->
+        <div class="gap-summary" id="gapSummary">
+          <!-- 动态渲染 -->
+        </div>
+
+        <!-- 针对短板的具体提升路径 -->
+        <div class="growth-paths" id="growthPaths">
+          <!-- 动态渲染 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-actions">
+    <button class="btn-ghost" onclick="restart()">重新搭建一个</button>
+    <button class="btn-primary" onclick="goScene('planSetup')">把建议变成训练计划 →</button>
+  </div>
+</div>
+
+<!-- ============ v3新增：训练计划确认 ============ -->
+<div class="scene" id="scene-planSetup">
+  <div class="scene-header">
+    <div class="scene-step" style="color:#fb923c;">
+      <span class="step-dot done"></span><span class="step-dot done"></span><span class="step-dot done"></span><span class="step-dot done"></span><span class="step-dot done"></span>
+      <span style="margin-left:8px;">测评完成 · 配置你的训练计划</span>
+    </div>
+    <button class="btn-ghost" onclick="goScene('result')">返回画像</button>
+  </div>
+
+  <div class="plan-wrap">
+    <div class="plan-intro-card">
+      <div class="plan-tag">TRAINING PLAN · 把建议变成行动</div>
+      <h2>光知道短板不够，练过才算</h2>
+      <p>Taste是训练出来的肌肉。下面你可以挑选愿意承诺的训练任务，设定周期，然后每天打卡——真正完成一个训练周期后，你会发现短板维度明显提升。</p>
+    </div>
+
+    <div class="plan-section">
+      <h3>① 挑选你愿意坚持的任务</h3>
+      <p class="plan-hint">（至少 1 个，最多 3 个。贪多嚼不烂。）</p>
+      <div class="plan-tasks" id="planTasks">
+        <!-- 动态渲染 -->
+      </div>
+    </div>
+
+    <div class="plan-section">
+      <h3>② 设定你的训练周期</h3>
+      <p class="plan-hint">研究显示：7天见雏形，14天成习惯，30天见成效。</p>
+      <div class="duration-options" id="durationOptions">
+        <div class="duration-option" data-days="7" onclick="pickDuration(this,7)">
+          <div class="dur-num">7</div>
+          <div class="dur-label">天体验</div>
+          <div class="dur-desc">先试水，看看手感</div>
+        </div>
+        <div class="duration-option selected" data-days="14" onclick="pickDuration(this,14)">
+          <div class="dur-num">14</div>
+          <div class="dur-label">天习惯</div>
+          <div class="dur-desc">推荐 · 形成最小习惯</div>
+        </div>
+        <div class="duration-option" data-days="30" onclick="pickDuration(this,30)">
+          <div class="dur-num">30</div>
+          <div class="dur-label">天蜕变</div>
+          <div class="dur-desc">硬核 · 肌肉级改变</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="plan-section">
+      <h3>③ 给你的训练计划起个名字</h3>
+      <p class="plan-hint">一个带有仪式感的名字，能让你更愿意坚持。</p>
+      <input class="plan-name-input" id="planNameInput" placeholder="例如：我的Taste 30天补短板计划" maxlength="30">
+    </div>
+
+    <div class="plan-preview">
+      <h4>📋 你的训练计划预览</h4>
+      <div class="plan-preview-row"><span class="lbl">计划名称</span><span class="val" id="previewName">（尚未命名）</span></div>
+      <div class="plan-preview-row"><span class="lbl">训练周期</span><span class="val" id="previewDur">14 天</span></div>
+      <div class="plan-preview-row"><span class="lbl">任务数量</span><span class="val" id="previewCount">0 个</span></div>
+      <div class="plan-preview-row"><span class="lbl">开始日期</span><span class="val" id="previewStart">今天</span></div>
+      <div class="plan-preview-row"><span class="lbl">预计完成</span><span class="val" id="previewEnd">-</span></div>
+    </div>
+
+    <div class="plan-footer">
+      <span class="footer-hint">计划会保存在本设备，可随时回来打卡</span>
+      <button class="btn-primary" id="btnStartPlan" onclick="startPlan()" disabled style="opacity:0.4;">开启我的训练 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ v3新增：打卡中心 ============ -->
+<div class="scene" id="scene-checkIn">
+  <div class="scene-header">
+    <div class="scene-step">
+      <span style="color:#fb923c;">✦ 训练进行中</span>
+    </div>
+    <div>
+      <button class="btn-ghost" onclick="confirmAbandonPlan()" style="margin-right:8px;">放弃计划</button>
+      <button class="btn-ghost" onclick="goScene('result')">返回画像</button>
+    </div>
+  </div>
+
+  <div class="checkin-wrap">
+    <!-- 顶部摘要 -->
+    <div class="checkin-header">
+      <div class="ch-left">
+        <h2 id="chPlanName">我的训练计划</h2>
+        <div class="ch-sub" id="chPlanMeta">14天 · 2 个任务</div>
+      </div>
+      <div class="ch-stats">
+        <div class="ch-stat"><div class="n" id="chDay">1</div><div class="l">当前 Day</div></div>
+        <div class="ch-stat"><div class="n" id="chStreak">0</div><div class="l">连续打卡</div></div>
+        <div class="ch-stat"><div class="n" id="chRate">0%</div><div class="l">完成率</div></div>
+      </div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="ch-progress">
+      <div class="ch-progress-head">
+        <span class="prog-label" id="chProgLabel">整体进度</span>
+        <span class="prog-val" id="chProgVal">0 / 0</span>
+      </div>
+      <div class="ch-progress-bar"><div class="fill" id="chProgBar" style="width:0%;"></div></div>
+    </div>
+
+    <!-- 今日任务 -->
+    <div class="ch-today-card">
+      <div class="today-head">
+        <div class="today-title">今日任务</div>
+        <div class="today-date" id="chTodayDate">-</div>
+      </div>
+      <div id="chTodayTasks">
+        <!-- 动态渲染 -->
+      </div>
+    </div>
+
+    <!-- 日历 -->
+    <div class="ch-calendar">
+      <h3>📅 训练日历</h3>
+      <div class="ch-cal-grid" id="chCalendar"></div>
+    </div>
+
+    <!-- 打卡历史 -->
+    <div class="ch-history">
+      <h3>📖 打卡反思记录</h3>
+      <div id="chHistory">
+        <div class="empty-state">还没有打卡记录。完成今天的任务来开启你的Taste成长档案吧。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 即时反馈Toast -->
+<div class="taste-toast" id="tasteToast">
+  <div class="label">TASTE 洞察</div>
+  <div class="text" id="toastText"></div>
+</div>
+
+<script>
+// ============ 全局状态 ============
+const state = {
+  direction: null,
+  user: null,
+  userNeeds: null,
+  scenario: null,
+  painpoints: ['p1','p2','p3','p4','p5'],
+  features: { kept: [], cut: [] },
+  color: { id: 'c1', bg: 'linear-gradient(135deg,#1a1a1a,#444)', name: '极简黑白' },
+  copy: { id: 'cp1', text: '欢迎回来' },
+  btnShape: { id: 'bs2', radius: 8, name: '小圆角' },
+  btnPos: { value: 'bottom', name: '底部固定' },
+  nav: { value: 'bottom', name: '底部Tab' },
+  radius: { id: 'r3', value: 14, name: '柔和' },
+  density: { id: 'd1', value: 'loose' },
+  // v3.2 新增
+  brandName: '同行',
+  slogan: { id: 'sl1', text: '一种生活方式' },
+  control: { id: 'ctrl1', value: 'user' },
+  notify: { id: 'ntf1', value: 'quiet' },
+  biz: { id: 'biz1', value: 'hidden' },
+  emptyText: { id: 'em1', text: '还没有内容' }
+};
+
+// ============ 场景切换（v3.3：每一步切换都先把当前 active scene 向上折叠收起，再展示目标） ============
+function goScene(name) {
+  const welcomeEl = document.getElementById('scene-welcome');
+  // 找到当前激活的 scene（如果有的话）
+  const currentEl = document.querySelector('.scene.active');
+  const targetEl = document.getElementById('scene-' + name);
+  if (!targetEl) return;
+
+  // 同一个 scene，无操作
+  if (currentEl === targetEl) return;
+
+  // 兜底：清掉 welcome 的 folded-done（如果是回 welcome）
+  if (welcomeEl && name === 'welcome') {
+    welcomeEl.classList.remove('folded-done');
+    welcomeEl.classList.remove('folding');
+    welcomeEl.classList.remove('folding-end');
+    welcomeEl.style.height = '';
+    welcomeEl.style.padding = '';
+  }
+
+  // 没有当前 scene，或目标是 welcome（直接显示，无折叠）
+  if (!currentEl || name === 'welcome') {
+    document.querySelectorAll('.scene').forEach(s => {
+      s.classList.remove('active');
+      s.classList.remove('folding');
+      s.classList.remove('folding-end');
+      s.style.height = '';
+    });
+    targetEl.classList.add('active');
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    return;
+  }
+
+  // === 折叠动画路径：current 向上压缩 → target 顶上 ===
+  // 1. 立即让 target 显示出来（fadeIn 动画会让它从下方淡入），垫在 current 下面
+  targetEl.classList.add('active');
+
+  // 2. 锁定 current 当前真实高度作为 transition 起点
+  const realH = currentEl.offsetHeight;
+  currentEl.style.height = realH + 'px';
+  // 强制 reflow 让 height 生效
+  currentEl.offsetHeight; // eslint-disable-line no-unused-expressions
+
+  // 3. 加 .folding（建立 transition 和 overflow:hidden 等基础态）
+  currentEl.classList.add('folding');
+  currentEl.classList.remove('active'); // 移除 active 避免动画与 fadeIn 冲突
+
+  // 4. 下一帧加 .folding-end，触发 height→0、opacity→0、transform 上移的过渡
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      currentEl.classList.add('folding-end');
+    });
+  });
+
+  // 5. 滚到顶部（current 还在收，但 sticky header 在顶部）
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+
+  // 6. 动画结束后清理：current 彻底隐藏
+  setTimeout(() => {
+    currentEl.classList.remove('folding');
+    currentEl.classList.remove('folding-end');
+    currentEl.style.height = '';
+    // 如果 current 是 welcome，给它加 folded-done 防止恢复原形
+    if (currentEl.id === 'scene-welcome') {
+      currentEl.classList.add('folded-done');
+    }
+    // 再次保险滚到顶
+    window.scrollTo({ top: 0, behavior: 'instant' in document.documentElement ? 'instant' : 'auto' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, 600);
+}
+
+// ============ 即时Toast反馈 ============
+function showTaste(text) {
+  const toast = document.getElementById('tasteToast');
+  document.getElementById('toastText').textContent = text;
+  toast.classList.add('show');
+  clearTimeout(window._toastT);
+  window._toastT = setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+// ============ 第二幕：定方向 ============
+function pickDirection(el, id) {
+  document.querySelectorAll('#directionGrid .direction-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.direction = id;
+  const tasteMap = {
+    tool: '选择工具型，说明你看重「实用价值」。这类产品的Taste核心是「不打扰」。',
+    content: '选择内容型，说明你看重「内容质量」。这类产品的Taste核心是「有共鸣」。',
+    social: '选择社交型，说明你看重「关系连接」。这类产品的Taste核心是「有温度」。',
+    business: '选择商业型，说明你看重「商业效率」。这类产品的Taste核心是「让人想买」。'
+  };
+  showTaste(tasteMap[id]);
+  checkDirectionDone();
+}
+
+// v3.1：服务对象选择 + 需求洞察排序
+// 每个用户群有6个候选需求，用户拖拽排序后取Top 3作为产品定调
+
+const USER_NEEDS = {
+  L1: { // 大学生
+    name: '大学生',
+    intro: '18-22岁的他们正处在人生的探索期：既有大量时间又总觉得"我应该做点什么"，社交需求旺盛，对新事物高度敏感。',
+    needs: [
+      { id:'n1', title:'被看见 / 被认可',     desc:'渴望在同龄人里有"我是谁"的标签和存在感' },
+      { id:'n2', title:'探索新世界',         desc:'对未知事物天生好奇，"试一下"成本很低' },
+      { id:'n3', title:'高效完成学业任务',    desc:'考试、作业、论文等"必须做"的事情' },
+      { id:'n4', title:'社交连接 / 找朋友',   desc:'希望通过共同兴趣找到同类、建立关系' },
+      { id:'n5', title:'省钱 / 性价比',      desc:'消费力有限，但又不想"看起来很穷"' },
+      { id:'n6', title:'娱乐 / 打发时间',     desc:'课后/通勤时段需要轻松愉悦的内容陪伴' }
+    ]
+  },
+  L2: { // 职场新人
+    name: '职场新人',
+    intro: '22-28岁的他们刚进入职场：充满成长焦虑、效率焦虑、薪资焦虑——"我比同龄人快还是慢？"是日常的潜台词。',
+    needs: [
+      { id:'n1', title:'快速成长 / 学习技能', desc:'希望在2-3年内成为某领域的"能用的人"' },
+      { id:'n2', title:'提升工作效率',       desc:'用工具/方法压缩重复性工作的时间' },
+      { id:'n3', title:'被领导认可',         desc:'希望自己的努力被看见、被肯定' },
+      { id:'n4', title:'拓展人脉 / 建立社交资本', desc:'职场关系网会影响接下来5-10年的路' },
+      { id:'n5', title:'理财 / 第一桶金',    desc:'刚开始有可支配收入，焦虑"钱去哪了"' },
+      { id:'n6', title:'自我治愈 / 减压',     desc:'高压工作后需要情绪出口和恢复时刻' }
+    ]
+  },
+  L3: { // 中年职场
+    name: '中年职场',
+    intro: '28-45岁的他们处于人生的"沉淀期"：有家庭责任、有职业天花板、时间被切碎、决策成本高——"性价比"和"可信"是关键词。',
+    needs: [
+      { id:'n1', title:'家庭责任 / 给家人最好的', desc:'孩子教育、父母健康、伴侣关系是重心' },
+      { id:'n2', title:'稳定可靠 / 错不起',  desc:'决策失误的代价变高，更看重确定性' },
+      { id:'n3', title:'深度内容 / 有营养',   desc:'不想要碎片娱乐，要"看完有收获"' },
+      { id:'n4', title:'高效解决问题',       desc:'时间被切碎，不想再花精力学新工具' },
+      { id:'n5', title:'保持竞争力 / 不被淘汰', desc:'担心被新人取代、被新技术抛下' },
+      { id:'n6', title:'管理财富 / 资产配置', desc:'有了一定积累，开始想"钱怎么生钱"' }
+    ]
+  },
+  L4: { // 银发用户
+    name: '银发用户',
+    intro: '55+岁的他们时间充裕但学习曲线陡：对复杂界面有天然恐惧，更看重"清晰、安全、不出错"，决策依赖熟人推荐。',
+    needs: [
+      { id:'n1', title:'操作简单 / 不会出错',  desc:'步骤越少越好，按钮越大越好' },
+      { id:'n2', title:'情感陪伴 / 排解孤独',  desc:'子女不在身边，需要被关心、被听见' },
+      { id:'n3', title:'健康管理',           desc:'体检结果、慢病管理、用药提醒' },
+      { id:'n4', title:'熟人社交 / 老朋友',   desc:'更愿意和真实认识的人来往，不爱陌生人' },
+      { id:'n5', title:'防骗 / 安全感',       desc:'对网络陷阱很警惕，怕被骗钱、骗信息' },
+      { id:'n6', title:'娱乐生活 / 打发时间',  desc:'广场舞、唱戏、看新闻、追剧' }
+    ]
+  }
+};
+
+// 用户排序的需求结果（state.userNeeds = ['n3','n1','n2', ...]）
+function pickUser(el, userId) {
+  document.querySelectorAll('#userPickGrid .user-pick-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.user = userId;
+  state.userNeeds = null;  // 重置需求排序
+
+  const data = USER_NEEDS[userId];
+  document.getElementById('userPickedName').textContent = data.name;
+  document.getElementById('needsRankTitle').textContent = `${data.name}最看重什么？`;
+
+  // 渲染6个需求选项（先随机洗牌，避免顺序暗示）
+  const needs = [...data.needs].sort(() => Math.random() - 0.5);
+  const list = document.getElementById('needsList');
+  list.innerHTML = needs.map((n, i) => `
+    <div class="need-item" draggable="true" data-id="${n.id}">
+      <span class="need-rank">${i+1}</span>
+      <div class="need-content">
+        <div class="need-title">${n.title}</div>
+        <div class="need-desc">${n.desc}</div>
+      </div>
+      <span class="need-handle">≡</span>
+    </div>
+  `).join('');
+
+  // 显示排序区
+  document.getElementById('needsRankSection').style.display = 'block';
+  document.getElementById('needsTip').style.display = 'none';
+
+  // 绑定拖拽排序
+  bindNeedsDrag();
+
+  // 预填入当前顺序
+  state.userNeeds = needs.map(n => n.id);
+
+  showTaste(`${data.intro}\n现在为TA真正的核心需求排序。`);
+  checkDirectionDone();
+}
+
+function bindNeedsDrag() {
+  const list = document.getElementById('needsList');
+  let dragSrc = null;
+
+  list.querySelectorAll('.need-item').forEach(item => {
+    item.addEventListener('dragstart', e => {
+      dragSrc = item; item.classList.add('dragging');
+    });
+    item.addEventListener('dragend', e => {
+      item.classList.remove('dragging');
+      // 排序完成后保存 + 给反馈
+      updateNeedsOrder();
+    });
+  });
+
+  list.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (!dragSrc) return;
+    const items = [...list.querySelectorAll('.need-item:not(.dragging)')];
+    const after = items.find(item => {
+      const box = item.getBoundingClientRect();
+      return e.clientY < box.top + box.height/2;
+    });
+    if (after) list.insertBefore(dragSrc, after);
+    else list.appendChild(dragSrc);
+  });
+}
+
+function updateNeedsOrder() {
+  const list = document.getElementById('needsList');
+  const items = [...list.querySelectorAll('.need-item')];
+  state.userNeeds = items.map(i => i.dataset.id);
+
+  // 更新排名编号
+  items.forEach((item, idx) => {
+    item.querySelector('.need-rank').textContent = idx + 1;
+  });
+
+  // 显示Taste解读（只在排过序之后）
+  showNeedsInsight();
+}
+
+function showNeedsInsight() {
+  const userId = state.user;
+  if (!userId || !state.userNeeds) return;
+  const data = USER_NEEDS[userId];
+  const top3Ids = state.userNeeds.slice(0, 3);
+  const top3Names = top3Ids.map(id => data.needs.find(n => n.id === id).title);
+
+  const tip = document.getElementById('needsTip');
+  tip.style.display = 'block';
+  tip.innerHTML = `
+    <strong>你眼中的 ${data.name}：</strong> 你认为TA最看重的是 <strong>「${top3Names[0]}」</strong>，其次是「${top3Names[1]}」「${top3Names[2]}」。<br>
+    这个判断会决定你做产品的"主航向"——下面所有的功能、文案、交互选择，都应该首先服务这个核心需求。Taste 不是凭空的，是从对人的理解开始的。
+  `;
+}
+
+function checkDirectionDone() {
+  const ok = state.direction && state.user;
+  document.getElementById('btnDirectionNext').disabled = !ok;
+  document.getElementById('directionStatus').textContent = ok ? '准备好了，继续' : '请完成两项选择';
+}
+
+// ============ 第三幕：定背景 ============
+function pickScenario(el, id) {
+  document.querySelectorAll('#scenarioCards .scenario-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.scenario = id;
+  const map = {
+    commute: '通勤场景：你的产品要做到「单手可用、3秒可懂、随时可断」。',
+    weekend: '周末场景：你的产品可以更深度，但要「值得花时间」。',
+    bedtime: '睡前场景：避免高强度信息，优先愉悦感和放松感。'
+  };
+  showTaste(map[id]);
+  document.getElementById('btnBgNext').disabled = false;
+  document.getElementById('bgStatus').textContent = '准备好了，继续';
+}
+
+// 痛点拖拽排序
+const painpointList = document.getElementById('painpointList');
+let dragSrc = null;
+painpointList.addEventListener('dragstart', e => {
+  if (e.target.classList.contains('painpoint-item')) {
+    dragSrc = e.target;
+    e.target.classList.add('dragging');
+  }
+});
+painpointList.addEventListener('dragend', e => {
+  if (e.target.classList.contains('painpoint-item')) {
+    e.target.classList.remove('dragging');
+  }
+});
+painpointList.addEventListener('dragover', e => {
+  e.preventDefault();
+  const items = [...painpointList.querySelectorAll('.painpoint-item:not(.dragging)')];
+  const after = items.find(item => {
+    const box = item.getBoundingClientRect();
+    return e.clientY < box.top + box.height/2;
+  });
+  if (after) painpointList.insertBefore(dragSrc, after);
+  else painpointList.appendChild(dragSrc);
+});
+painpointList.addEventListener('drop', () => {
+  const items = [...painpointList.querySelectorAll('.painpoint-item')];
+  state.painpoints = items.map(i => i.dataset.id);
+  items.forEach((item, idx) => {
+    item.querySelector('.painpoint-rank').textContent = idx + 1;
+    item.querySelector('.painpoint-rank').style.background = idx === 0 ? '#fff' : '#222';
+    item.querySelector('.painpoint-rank').style.color = idx === 0 ? '#000' : '#888';
+  });
+  const top = state.painpoints[0];
+  const map = {
+    p1: '把「时间」放第一：你的产品Taste是「极致效率」。',
+    p2: '把「动力」放第一：你的产品Taste是「情感激励」。',
+    p3: '把「引导」放第一：你的产品Taste是「贴心陪伴」。',
+    p4: '把「简化」放第一：你的产品Taste是「极简主义」。',
+    p5: '把「社交」放第一：你的产品Taste是「关系驱动」。'
+  };
+  showTaste(map[top]);
+});
+
+// ============ 第四幕：搭MVP（三态可切换：未决定 / 保留 / 划掉） ============
+const featureNames = {
+  f1:'个人主页', f2:'数据统计', f3:'社交动态', f4:'内容推荐', f5:'课程/任务系统',
+  f6:'排行榜', f7:'收藏夹', f8:'通知系统', f9:'搜索', f10:'评论互动'
+};
+
+// 同一张卡再次点击同状态 = 取消该状态（回到"未决定"）
+function setFeature(id, targetState) {
+  const card = document.querySelector(`.feature-card[data-id="${id}"]`);
+  if (!card) return;
+
+  const currentlyKept = card.classList.contains('kept');
+  const currentlyRemoved = card.classList.contains('removed');
+  const isCurrentState = (targetState === 'kept' && currentlyKept) ||
+                         (targetState === 'removed' && currentlyRemoved);
+
+  // 先把它从原列表里移除（不论从什么状态切换都先清理）
+  state.features.kept = state.features.kept.filter(f => f !== id);
+  state.features.cut = state.features.cut.filter(f => f !== id);
+  card.classList.remove('kept', 'removed');
+  // 清理按钮高亮
+  card.querySelector('.keep-btn').classList.remove('active');
+  card.querySelector('.cut-btn').classList.remove('active');
+
+  if (isCurrentState) {
+    // 再次点击当前状态 = 取消，回到"未决定"
+    showTaste(`「${featureNames[id]}」已恢复未决定。可以再想想。`);
+  } else if (targetState === 'kept') {
+    // 想要保留
+    if (state.features.kept.length >= 3) {
+      showTaste('已经保留了3个核心功能。MVP最多3个，再多就不是MVP了。');
+      // 既不进保留也不进划掉，保持未决定
+    } else {
+      card.classList.add('kept');
+      card.querySelector('.keep-btn').classList.add('active');
+      state.features.kept.push(id);
+      const n = state.features.kept.length;
+      if (n === 1) showTaste(`第1个核心功能：「${featureNames[id]}」。这是你产品的"主心骨"。`);
+      else if (n === 2) showTaste(`两个核心功能：${state.features.kept.map(f=>featureNames[f]).join('、')}。已经够支撑一个MVP了。`);
+      else showTaste(`三个核心功能就位：${state.features.kept.map(f=>featureNames[f]).join('、')}。这是真正的MVP上限。`);
+    }
+  } else if (targetState === 'removed') {
+    // 划掉
+    card.classList.add('removed');
+    card.querySelector('.cut-btn').classList.add('active');
+    state.features.cut.push(id);
+    showTaste(`划掉「${featureNames[id]}」：每按一次"划掉"，都是一次Taste的觉醒。`);
+  }
+
+  refreshMvpStats();
+}
+
+function refreshMvpStats() {
+  const keptN = state.features.kept.length;
+  const cutN = state.features.cut.length;
+  const left = 10 - keptN - cutN;
+  document.getElementById('keptCount').textContent = keptN;
+  document.getElementById('cutCount').textContent = cutN;
+  document.getElementById('totalLeft').textContent = left;
+
+  // 完成条件：保留 1-3 个；划掉数没有硬性要求（鼓励但不强制）
+  const ok = keptN >= 1 && keptN <= 3;
+  document.getElementById('btnMvpNext').disabled = !ok;
+  const statusEl = document.getElementById('mvpStatus');
+  if (keptN === 0) statusEl.textContent = '至少保留 1 个核心功能即可继续';
+  else if (keptN > 3) statusEl.textContent = `保留太多了（${keptN}个），最多3个`;
+  else statusEl.textContent = `已保留 ${keptN} 个核心 · ${cutN > 0 ? '划掉了 '+cutN+' 个 · ' : ''}可以继续了`;
+}
+
+// ============ 第五幕：定风格（v3.2 升级 — 微信哲学 + 写实手机） ============
+
+// 微信产品观引用句
+const PHI = {
+  color: {
+    c1: '微信主色一直是黑/灰/绿——克制是产品的底色。"产品的颜色，不该比内容更吸引眼球。"',
+    c5: '你选了微信绿。这是张小龙说的"克制的颜色"——足够友好但不张扬，14年没换过。',
+    c2: '渐变在视觉上有冲击力，但要小心——"花哨可以一时吸引，但留住用户的从来不是颜色"（张小龙）。',
+    c3: '温暖色让产品有温度。但要记住：温度来自每个细节而非颜色本身——"颜色只是表象，价值观才是核心"。',
+    c4: '深蓝传递专业感。微信的群发、企业微信都偏向类似克制的色调——B端用户期待的是"信任"而非"惊艳"。',
+    c6: '柔和米色少见但有特色——会让你的产品像一份手工制品而非工业产品。但要小心信息可读性。'
+  },
+  copy: {
+    cp1: '"欢迎回来"是非常微信的写法——不卖力、不亢奋、就像老朋友。',
+    cp2: '激励型文案适合健身/学习类——但用多了会显得"用力过猛"。',
+    cp3: '"登录到账户"是工程师写法——准确但冰冷。微信不会这样写。',
+    cp4: '趣味文案能拉近距离——但每天看一次，新鲜感会衰减。',
+    cp5: '不写文案。这是微信主屏的做法——直接展示内容，"产品本身就是问候"。'
+  },
+  control: {
+    ctrl1: '微信价值观第一条：用户主权。"我不希望我们去骚扰用户，由用户决定要不要看。" — 张小龙',
+    ctrl2: '平衡折中是大多数产品的现实选择——但要警惕"折中"成"绑架"。',
+    ctrl3: '平台主导路径短期增长快，但用户长期会反感。微信明确反对这种做法。'
+  },
+  notify: {
+    ntf1: '"如果用户没事就被打扰，那他下次就不会愿意打开了。" — 这是微信通知策略的核心。',
+    ntf2: '适度通知考验产品判断力——什么是"重要"？什么是"为了KPI"？',
+    ntf3: '密集通知是数据指标的诱惑——但每打扰一次，都是在透支用户耐心。'
+  },
+  biz: {
+    biz1: '微信广告只在朋友圈第5条出现一次——克制是商业的奢侈品，但也是长期主义的回报。',
+    biz2: '情境融入是微信小程序的思路——不在不需要的地方出现，需要时一查就有。',
+    biz3: '显眼直接能短期变现，但用户会用脚投票。微信选择了相反的路。'
+  }
+};
+
+// === 主色调 ===
+function pickColor(el) {
+  document.querySelectorAll('#colorOptions .color-option').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.color = { id: el.dataset.id, bg: el.dataset.bg, name: el.dataset.name };
+  refreshRealisticPhone();
+  if (PHI.color[el.dataset.id]) {
+    showPhi('colorPhi', 'colorPhiText', PHI.color[el.dataset.id]);
+  }
+}
+
+// === Logo / 品牌名 ===
+function refreshBrandName() {
+  const v = (document.getElementById('brandNameInput').value || '').trim() || '同行';
+  state.brandName = v;
+  refreshRealisticPhone();
+}
+
+// === Slogan ===
+function pickSlogan(el) {
+  document.querySelectorAll('#sloganOptions .copy-option').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.slogan = { id: el.dataset.id, text: el.dataset.text };
+  refreshRealisticPhone();
+}
+
+// === 欢迎语 ===
+function pickCopy(el) {
+  document.querySelectorAll('#copyOptions .copy-option').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.copy = { id: el.dataset.id, text: el.dataset.text };
+  refreshRealisticPhone();
+  if (PHI.copy[el.dataset.id]) {
+    showPhi('copyPhi', 'copyPhiText', PHI.copy[el.dataset.id]);
+  }
+}
+
+// === 按钮形状 ===
+function pickBtnShape(el) {
+  document.querySelectorAll('#btnShapeGrid .comp-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const r = parseInt(el.dataset.radius);
+  state.btnShape = { id: el.dataset.id, radius: r, name: el.querySelector('.c-name').textContent };
+  refreshRealisticPhone();
+}
+
+// === 按钮位置 ===
+function pickBtnPos(el) {
+  document.querySelectorAll('#btnPosGrid .comp-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.btnPos = { value: el.dataset.pos, name: el.querySelector('.c-name').textContent };
+  refreshRealisticPhone();
+}
+
+// === 导航 ===
+function pickNav(el) {
+  document.querySelectorAll('#navGrid .comp-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.nav = { value: el.dataset.nav, name: el.querySelector('.c-name').textContent };
+  refreshRealisticPhone();
+}
+
+// === 卡片圆角 ===
+function pickRadius(el) {
+  document.querySelectorAll('#radiusGrid .comp-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const r = parseInt(el.dataset.r);
+  state.radius = { id: el.dataset.id, value: r, name: el.querySelector('.c-name').textContent };
+  refreshRealisticPhone();
+}
+
+// === 视觉密度 ===
+function pickDensity(el) {
+  document.querySelectorAll('#densityOptions .copy-option').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.density = { id: el.dataset.id, value: el.dataset.density };
+  refreshRealisticPhone();
+}
+
+// === 用户掌控权 ===
+function pickControl(el) {
+  document.querySelectorAll('#controlOptions .copy-option').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.control = { id: el.dataset.id, value: el.dataset.control };
+  if (PHI.control[el.dataset.id]) {
+    showPhi('controlPhi', 'controlPhiText', PHI.control[el.dataset.id]);
+  }
+  refreshRealisticPhone();
+}
+
+// === 通知策略 ===
+function pickNotify(el) {
+  document.querySelectorAll('#notifyOptions .copy-option').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.notify = { id: el.dataset.id, value: el.dataset.notify };
+  if (PHI.notify[el.dataset.id]) {
+    showPhi('notifyPhi', 'notifyPhiText', PHI.notify[el.dataset.id]);
+  }
+  refreshRealisticPhone();
+}
+
+// === 商业化策略 ===
+function pickBiz(el) {
+  document.querySelectorAll('#bizOptions .copy-option').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.biz = { id: el.dataset.id, value: el.dataset.biz };
+  if (PHI.biz[el.dataset.id]) {
+    showPhi('bizPhi', 'bizPhiText', PHI.biz[el.dataset.id]);
+  }
+  refreshRealisticPhone();
+}
+
+// === 空状态文案 ===
+function pickEmpty(el) {
+  document.querySelectorAll('#emptyOptions .copy-option').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.emptyText = { id: el.dataset.id, text: el.dataset.text };
+  // 空状态不主动展示，但记下来
+}
+
+// 显示某个微信哲学注释
+function showPhi(boxId, textId, text) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  document.getElementById(textId).textContent = text;
+  box.style.display = 'flex';
+}
+
+// ====== 写实手机预览的核心渲染 ======
+function refreshRealisticPhone() {
+  // 顶部品牌区
+  const brandBar = document.getElementById('rlBrandBar');
+  brandBar.style.background = state.color.bg;
+  // 浅色配色用深色文字
+  const isLight = state.color.id === 'c6';
+  brandBar.style.color = isLight ? '#333' : '#fff';
+
+  // Logo
+  document.getElementById('rlLogo').textContent = state.brandName || '同行';
+
+  // 欢迎语
+  document.getElementById('rlGreeting').textContent = state.copy.text || '';
+
+  // Slogan
+  document.getElementById('rlSlogan').textContent = (state.slogan && state.slogan.text && state.slogan.text !== '(无 Slogan)') ? state.slogan.text : '';
+
+  // 内容卡片：综合多个维度生成
+  refreshPhoneContent();
+
+  // 主行动按钮
+  refreshRealisticBtn();
+
+  // 导航
+  refreshRealisticNav();
+
+  // 视觉密度（影响内容padding）
+  const content = document.getElementById('rlContent');
+  if (state.density.value === 'loose') content.style.padding = '20px 18px';
+  else if (state.density.value === 'medium') content.style.padding = '14px 16px';
+  else content.style.padding = '10px 14px';
+}
+
+// 渲染手机的内容卡片：根据保留功能、商业化策略、密度等综合
+function refreshPhoneContent() {
+  const content = document.getElementById('rlContent');
+  const r = state.radius.value;
+  const cardRadius = r === 50 ? 24 : r;
+  const padScale = state.density.value === 'loose' ? 16 : state.density.value === 'medium' ? 12 : 8;
+  const marginScale = state.density.value === 'loose' ? 12 : state.density.value === 'medium' ? 8 : 5;
+
+  // 根据MVP保留的功能生成卡片
+  const kept = state.features.kept;
+  const cards = [];
+  if (kept.length === 0) {
+    // 空状态
+    cards.push(`<div class="rl-card empty-state" style="border-radius:${cardRadius}px;">${state.emptyText && state.emptyText.text || '还没有内容'}</div>`);
+  } else {
+    kept.slice(0, 3).forEach((fid, i) => {
+      const name = featureNames[fid];
+      cards.push(`
+        <div class="rl-card" style="border-radius:${cardRadius}px; padding:${padScale}px; margin-bottom:${marginScale}px;">
+          <div class="rl-card-head">
+            <div class="rl-card-title">${getCardTitle(fid, i)}</div>
+            <div class="rl-card-tag ${i===0?'hot':''}">${getCardTag(fid, i)}</div>
+          </div>
+          <div class="rl-card-desc">${getCardDesc(fid, i)}</div>
+          <div class="rl-card-meta">
+            <span>${getCardMeta(i)}</span>
+          </div>
+        </div>
+      `);
+    });
+  }
+
+  // 商业化卡片：根据 biz 策略决定要不要、放哪儿
+  if (state.biz && state.biz.value === 'prominent' && cards.length > 0) {
+    // 显眼商业化：插在最前面
+    cards.unshift(`
+      <div class="rl-card ad-card" style="border-radius:${cardRadius}px; padding:${padScale}px; margin-bottom:${marginScale}px;">
+        <div class="rl-card-head">
+          <div class="rl-card-title">限时活动 · 立省50元</div>
+          <div class="rl-card-tag">广告</div>
+        </div>
+        <div class="rl-card-desc">点击立即领取，仅剩2小时</div>
+      </div>
+    `);
+  } else if (state.biz && state.biz.value === 'contextual' && cards.length >= 2) {
+    // 情境融入：插在第2个之后
+    cards.splice(2, 0, `
+      <div class="rl-card ad-card" style="border-radius:${cardRadius}px; padding:${padScale}px; margin-bottom:${marginScale}px; opacity:0.85;">
+        <div class="rl-card-head">
+          <div class="rl-card-title">推荐 · 你可能感兴趣</div>
+          <div class="rl-card-tag">推广</div>
+        </div>
+        <div class="rl-card-desc">基于你的偏好的精选内容</div>
+      </div>
+    `);
+  }
+  // hidden 模式不在首屏显示商业化
+
+  content.innerHTML = cards.join('');
+}
+
+function getCardTitle(fid, idx) {
+  const map = {
+    f1: ['张小龙的简介', '@同行小助手', '我的主页'],
+    f2: ['本周数据 · 上升12%', '完成率 78%', '使用统计'],
+    f3: ['好友动态 · 3条新内容', '@小明 分享了一篇文章', '@阿杰 推荐了好物'],
+    f4: ['为你推荐', '热门内容 · 今日精选', '基于你的兴趣'],
+    f5: ['今日学习任务', '本周课程 · 第3章', '专栏 · 第12讲'],
+    f6: ['本月排行 · 你第8名', '本周达人榜', '挑战赛 · 还有3天'],
+    f7: ['我的收藏 · 12篇', '已收藏的内容', '稍后再看'],
+    f8: ['新通知 · 2条', '系统提醒', '消息中心'],
+    f9: ['搜索内容', '热搜 · 排版美学', '最近搜索'],
+    f10:['评论 · 5条新回复', '热评 · 精彩讨论', '我的发言']
+  };
+  return (map[fid] || ['内容','内容','内容'])[idx % 3];
+}
+function getCardTag(fid, idx) {
+  if (idx === 0) return '推荐';
+  if (idx === 1) return '热门';
+  return '更新';
+}
+function getCardDesc(fid, idx) {
+  const map = {
+    f1: '记录你的故事，连接同道中人',
+    f2: '可视化你的进步，看见每一步成长',
+    f3: '只看朋友的真实分享，无算法干扰',
+    f4: '不是越多越好，而是越懂你越好',
+    f5: '系统化学习，避免碎片化焦虑',
+    f6: '激励来自看到自己的进步',
+    f7: '你认为重要的，应该被妥善保存',
+    f8: '只在必要时打扰你',
+    f9: '让你主动找到，而非被动接受',
+    f10:'真诚的讨论比点赞更有价值'
+  };
+  return map[fid] || '产品的核心价值由你定义';
+}
+function getCardMeta(idx) {
+  const metas = ['2分钟前 · 128人已看', '今天 · 89人参与', '昨天 · 已更新'];
+  return metas[idx] || '';
+}
+
+function refreshRealisticBtn() {
+  const btn = document.getElementById('rlMainBtn');
+  if (!btn) return;
+  // 主色提取 — 用color主梯度的暗调
+  const bg = getMainColor();
+  btn.style.background = bg;
+  btn.style.color = state.color.id === 'c6' ? '#000' : '#fff';
+
+  btn.style.left = btn.style.right = btn.style.top = btn.style.bottom = '';
+  btn.style.width = btn.style.height = '';
+
+  // 计算 tabbar 占位
+  const tabH = state.nav.value === 'bottom' ? 62 : 0;
+  const tabPad = state.nav.value === 'drawer' ? 48 : 0;
+
+  if (state.btnPos.value === 'bottom') {
+    btn.style.left = (tabPad + 18) + 'px';
+    btn.style.right = '18px';
+    btn.style.bottom = (tabH + 12) + 'px';
+    btn.style.height = '44px';
+    btn.style.borderRadius = state.btnShape.radius + 'px';
+    btn.style.fontSize = '0.88em';
+    btn.textContent = '开始体验';
+  } else if (state.btnPos.value === 'float') {
+    btn.style.right = '18px';
+    btn.style.bottom = (tabH + 18) + 'px';
+    btn.style.width = '52px';
+    btn.style.height = '52px';
+    btn.style.borderRadius = '50%';
+    btn.style.fontSize = '1.5em';
+    btn.textContent = '+';
+  } else {
+    // inline
+    btn.style.left = (tabPad + 18) + 'px';
+    btn.style.bottom = (tabH + 80) + 'px';
+    btn.style.width = '50%';
+    btn.style.height = '38px';
+    btn.style.borderRadius = state.btnShape.radius + 'px';
+    btn.style.fontSize = '0.78em';
+    btn.textContent = '试一下';
+  }
+}
+
+function refreshRealisticNav() {
+  const nav = document.getElementById('rlTabBar');
+  if (!nav) return;
+  nav.classList.remove('top', 'drawer');
+  if (state.nav.value === 'top') nav.classList.add('top');
+  if (state.nav.value === 'drawer') nav.classList.add('drawer');
+}
+
+function getMainColor() {
+  // 各色调对应一个用作按钮背景的"主色"
+  const map = {
+    c1: '#1a1a1a',
+    c2: '#667eea',
+    c3: '#f87171',
+    c4: '#1e3a8a',
+    c5: '#07c160',
+    c6: '#fbbf24'
+  };
+  return map[state.color.id] || '#000';
+}
+
+// 绑定品牌名输入
+function bindBrandInput() {
+  const input = document.getElementById('brandNameInput');
+  if (input && !input._bound) {
+    input.addEventListener('input', refreshBrandName);
+    input._bound = true;
+  }
+}
+
+// 进入定风格场景时初始化
+function initStyleScene() {
+  if (!state.brandName) state.brandName = '同行';
+  if (!state.slogan) state.slogan = { id: 'sl1', text: '一种生活方式' };
+  if (!state.control) state.control = { id: 'ctrl1', value: 'user' };
+  if (!state.notify) state.notify = { id: 'ntf1', value: 'quiet' };
+  if (!state.biz) state.biz = { id: 'biz1', value: 'hidden' };
+  if (!state.emptyText) state.emptyText = { id: 'em1', text: '还没有内容' };
+  bindBrandInput();
+  refreshRealisticPhone();
+}
+
+// 实时把保留的3个功能渲染到预览（v3.2：调用新的写实手机渲染）
+function refreshPreviewFeatures() {
+  if (typeof refreshRealisticPhone === 'function') {
+    refreshRealisticPhone();
+  }
+}
+
+// ============ 完成 → 生成Taste画像 ============
+function finish() {
+  refreshPreviewFeatures();
+  generateTasteProfile();
+  goScene('result');
+}
+
+function generateTasteProfile() {
+  // 根据全部选择，生成产品人格
+  const persona = decidePersona();
+
+  document.getElementById('personaName').textContent = persona.name;
+  document.getElementById('personaDesc').textContent = persona.desc;
+  document.getElementById('resultTitle').textContent = `你是一位「${persona.name}」`;
+
+  // 标签
+  document.getElementById('personaTags').innerHTML = persona.tags.map(t => `<span class="persona-tag">${t}</span>`).join('');
+
+  // v2升级：深度3层洞察（现象→原因→引申）
+  document.getElementById('insightList').innerHTML = persona.insights.map((it, i) => `
+    <div class="insight-item">
+      <div class="insight-head">
+        <div class="num">${i+1}</div>
+        <div class="title">${it.title}</div>
+      </div>
+      <div class="insight-body">
+        <div class="layer"><span class="layer-label">现象</span>${it.phenomenon}</div>
+        <div class="layer"><span class="layer-label">为什么</span>${it.reason}</div>
+        <div class="layer"><span class="layer-label">引申</span>${it.implication}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // 类似产品
+  document.getElementById('similarProducts').innerHTML = persona.similar.map(s => `<div class="similar-prod">${s}</div>`).join('');
+
+  // v2新增：微信价值观对照
+  renderWechatComparison(persona);
+
+  // v2新增：产品故事
+  renderProductStories(persona);
+
+  // v2新增：Taste提升路径（基于补短板逻辑）
+  renderGrowthPaths(persona);
+
+  // 渲染最终手机（包含按钮和导航）
+  renderResultPhone();
+}
+
+// v2.1重构：补短板的成长建议
+function renderGrowthPaths(persona) {
+  // 1. 计算五维得分
+  const scores = calcTasteScores();
+  // 2. 诊断短板
+  const diag = diagnoseWeaknesses(scores);
+
+  // 3. 渲染五维条
+  const dimsEl = document.getElementById('tasteDims');
+  dimsEl.innerHTML = diag.sorted.map(d => {
+    const dim = TASTE_DIMS[d.key];
+    let className = '';
+    let tag = '';
+    if (d.key === diag.strong.key) { className = 'strong'; tag = `<span class="dim-tag">${dim.high}</span>`; }
+    if (diag.weak.some(w => w.key === d.key)) { className = 'weak'; tag = `<span class="dim-tag">待提升</span>`; }
+    return `
+      <div class="taste-dim ${className}">
+        <div class="dim-name">${dim.name}${tag}</div>
+        <div class="dim-bar-wrap"><div class="dim-bar" style="width:${d.score}%;"></div></div>
+        <div class="dim-score">${d.score}</div>
+      </div>
+    `;
+  }).join('');
+
+  // 4. 渲染短板总结
+  const strongDim = TASTE_DIMS[diag.strong.key];
+  const weakNames = diag.weak.map(w => TASTE_DIMS[w.key].name).join(' + ');
+  document.getElementById('growthHeadline').textContent = `你的Taste五维画像`;
+  document.getElementById('growthIntro').textContent = `Taste不是单一维度，是五个维度的综合。培训的真正价值不在于"继续强化你已经擅长的"，而在于"补齐那些被忽视的"。下面是基于你搭建决策诊断出的五维得分：`;
+
+  document.getElementById('gapSummary').innerHTML = `
+    你的强项是 <strong>${strongDim.name}</strong>（${strongDim.high}）——这是你的"长板"，会让你在${strongDim.desc}上表现突出。<br>
+    但你的 <strong>${weakNames}</strong> 相对薄弱——这些维度的短板，会在你做不同类型的产品时成为隐形天花板。<br>
+    <br>
+    ✦ <strong>培训建议：不要继续锤炼已经擅长的，去练你不擅长的。</strong> 真正的Taste不是单维度强，而是五维都达到"及格线"。
+  `;
+
+  // 5. 针对2个短板维度，各给2条具体建议（共约4条）
+  const weakDims = diag.weak.map(w => w.key);
+  let paths = [];
+  weakDims.forEach(dimKey => {
+    DIM_ADVICE[dimKey].paths.forEach(p => {
+      paths.push({ dimKey, ...p });
+    });
+  });
+
+  document.getElementById('growthPaths').innerHTML = paths.map((g, i) => {
+    const dim = TASTE_DIMS[g.dimKey];
+    return `
+      <div class="growth-path">
+        <div class="gp-head">
+          <div class="gp-num">${i+1}</div>
+          <span class="gp-dim-label">${dim.name}</span>
+          <div class="gp-title">${g.title}</div>
+        </div>
+        <div class="gp-method">${g.method}</div>
+        <div class="gp-action">${g.action}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderResultPhone() {
+  // v3.2：结果页也用写实手机渲染 — 直接克隆当前style场景的预览
+  const resultPhone = document.getElementById('resultPhone');
+  if (!resultPhone) return;
+
+  // 重新构造一份完整的写实手机HTML（与scene-style的结构一致）
+  resultPhone.classList.add('realistic');
+
+  const r = state.radius.value;
+  const cardRadius = r === 50 ? 24 : r;
+  const isLight = state.color.id === 'c6';
+
+  // 计算Tab位置类
+  const navClass = state.nav.value === 'top' ? 'top' : (state.nav.value === 'drawer' ? 'drawer' : '');
+
+  // Tab占用空间
+  const tabH = state.nav.value === 'bottom' ? 62 : 0;
+  const tabPad = state.nav.value === 'drawer' ? 48 : 0;
+
+  // 主按钮位置
+  let btnStyle = '';
+  let btnText = '开始体验';
+  if (state.btnPos.value === 'bottom') {
+    btnStyle = `left:${tabPad+18}px; right:18px; bottom:${tabH+12}px; height:44px; border-radius:${state.btnShape.radius}px; font-size:0.88em;`;
+  } else if (state.btnPos.value === 'float') {
+    btnStyle = `right:18px; bottom:${tabH+18}px; width:52px; height:52px; border-radius:50%; font-size:1.5em;`;
+    btnText = '+';
+  } else {
+    btnStyle = `left:${tabPad+18}px; bottom:${tabH+80}px; width:50%; height:38px; border-radius:${state.btnShape.radius}px; font-size:0.78em;`;
+    btnText = '试一下';
+  }
+  const btnBg = getMainColor();
+  const btnColor = isLight ? '#000' : '#fff';
+
+  // 内容卡片
+  const padScale = state.density.value === 'loose' ? 16 : state.density.value === 'medium' ? 12 : 8;
+  const marginScale = state.density.value === 'loose' ? 12 : state.density.value === 'medium' ? 8 : 5;
+  const kept = state.features.kept;
+  let cards = '';
+  if (kept.length === 0) {
+    cards = `<div class="rl-card empty-state" style="border-radius:${cardRadius}px;">${(state.emptyText && state.emptyText.text) || '还没有内容'}</div>`;
+  } else {
+    cards = kept.slice(0, 3).map((fid, i) => `
+      <div class="rl-card" style="border-radius:${cardRadius}px; padding:${padScale}px; margin-bottom:${marginScale}px;">
+        <div class="rl-card-head">
+          <div class="rl-card-title">${getCardTitle(fid, i)}</div>
+          <div class="rl-card-tag ${i===0?'hot':''}">${getCardTag(fid, i)}</div>
+        </div>
+        <div class="rl-card-desc">${getCardDesc(fid, i)}</div>
+        <div class="rl-card-meta"><span>${getCardMeta(i)}</span></div>
+      </div>
+    `).join('');
+    // 商业化卡片
+    if (state.biz && state.biz.value === 'prominent') {
+      cards = `<div class="rl-card ad-card" style="border-radius:${cardRadius}px; padding:${padScale}px; margin-bottom:${marginScale}px;">
+        <div class="rl-card-head">
+          <div class="rl-card-title">限时活动 · 立省50元</div>
+          <div class="rl-card-tag">广告</div>
+        </div>
+        <div class="rl-card-desc">点击立即领取，仅剩2小时</div>
+      </div>` + cards;
+    }
+  }
+
+  const contentPad = state.density.value === 'loose' ? '20px 18px' : state.density.value === 'medium' ? '14px 16px' : '10px 14px';
+
+  const slogan = (state.slogan && state.slogan.text && state.slogan.text !== '(无 Slogan)') ? state.slogan.text : '';
+  const greeting = state.copy.text || '';
+  const brand = state.brandName || '同行';
+
+  resultPhone.innerHTML = `
+    <div class="rl-status-bar">
+      <span class="rl-time">9:41</span>
+      <span class="rl-icons"><span class="rl-signal">●●●</span><span class="rl-wifi">⌬</span><span class="rl-battery">▮</span></span>
+    </div>
+    <div class="rl-brand-bar" style="background:${state.color.bg}; color:${isLight ? '#333' : '#fff'};">
+      <div class="rl-logo">${brand}</div>
+      ${greeting ? `<div class="rl-greeting">${greeting}</div>` : ''}
+      ${slogan ? `<div class="rl-slogan">${slogan}</div>` : ''}
+    </div>
+    <div class="rl-content" style="padding:${contentPad};">
+      ${cards}
+    </div>
+    <div class="rl-main-btn" style="background:${btnBg}; color:${btnColor}; ${btnStyle}">${btnText}</div>
+    <div class="rl-tabbar ${navClass}">
+      <div class="rl-tab active"><span class="rl-tab-icon">●</span><span>首页</span></div>
+      <div class="rl-tab"><span class="rl-tab-icon">◇</span><span>发现</span></div>
+      <div class="rl-tab"><span class="rl-tab-icon">○</span><span>我的</span></div>
+    </div>
+  `;
+}
+
+// v2新增：渲染微信价值观对照
+function renderWechatComparison(persona) {
+  // 微信"好产品"的6条价值观（张小龙在微信公开课提到的核心理念）
+  const wechatPrinciples = [
+    {
+      name: "好的产品是用完即走",
+      text: "微信不希望用户被App困住，而是希望用户高效完成事情后离开，再回来。"
+    },
+    {
+      name: "让创造价值的人，体现价值",
+      text: "微信不主动推送广告，而是让优质内容自然涌现——尊重创作者的劳动。"
+    },
+    {
+      name: "不打扰用户",
+      text: "通知克制、推送克制、强提醒克制——微信极少做「为了KPI而打扰用户」的事。"
+    },
+    {
+      name: "去中心化",
+      text: "公众号、小程序、视频号都没有中心化的「流量入口」——给小玩家公平的机会。"
+    },
+    {
+      name: "做正确的事，不做容易的事",
+      text: "比如朋友圈不显示访客记录、视频号不显示在线状态——这些都是「违反人性但正确」的决定。"
+    },
+    {
+      name: "用户价值大于商业价值",
+      text: `短期有损商业利益的功能，只要对用户有价值，微信也会做（如"取消关注"按钮）。`
+    }
+  ];
+
+  document.getElementById('wechatHeadline').textContent = `${persona.name} vs 微信Taste：异同对照`;
+  document.getElementById('wechatIntro').textContent = persona.wechatIntro;
+
+  // 选3条与人格对照
+  document.getElementById('wechatPrinciples').innerHTML = persona.wechatHits.map(idx => {
+    const p = wechatPrinciples[idx];
+    return `
+      <div class="wc-principle">
+        <span class="wc-name">「${p.name}」</span>
+        <span class="wc-text">${p.text}</span>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('wechatConclusion').innerHTML = persona.wechatConclusion;
+}
+
+// v2新增：渲染产品故事
+function renderProductStories(persona) {
+  document.getElementById('storyList').innerHTML = persona.stories.map(s => `
+    <div class="story-item">
+      <div class="story-head">
+        <div class="story-prod">${s.product}</div>
+        <div class="story-tag">${s.tag}</div>
+      </div>
+      <div class="story-text">${s.story}</div>
+      <div class="story-takeaway">${s.takeaway}</div>
+    </div>
+  `).join('');
+}
+
+// v2.1重构：Taste五维模型
+// 培训的本质是补短板——先诊断用户的五维得分，再针对短板给建议
+const TASTE_DIMS = {
+  restraint: {
+    name: '克制力',
+    desc: '做减法、不堆功能、留白的能力',
+    high: '擅长取舍',
+    low: '容易堆砌'
+  },
+  empathy: {
+    name: '共情力',
+    desc: '理解用户情感、做有温度产品的能力',
+    high: '有温度',
+    low: '偏理性'
+  },
+  pragmatism: {
+    name: '实用力',
+    desc: '解决真问题、关注效率价值的能力',
+    high: '接地气',
+    low: '偏理想化'
+  },
+  connection: {
+    name: '连接力',
+    desc: '理解人与人关系、设计社交机制的能力',
+    high: '懂社交',
+    low: '偏个人'
+  },
+  aesthetic: {
+    name: '鉴赏力',
+    desc: '识别好内容、做好内容呈现的能力',
+    high: '有品位',
+    low: '偏功能'
+  }
+};
+
+// 五维得分计算：基于用户在整个流程中的所有决策
+function calcTasteScores() {
+  const s = { restraint:50, empathy:50, pragmatism:50, connection:50, aesthetic:50 };
+
+  // 1. 产品方向对维度的基础影响
+  const dirMap = {
+    tool:      { pragmatism:+20, restraint:+10, empathy:-5, connection:-10, aesthetic:-5 },
+    content:   { aesthetic:+20, restraint:+5, connection:+5, pragmatism:-5, empathy:0 },
+    social:    { connection:+25, empathy:+10, restraint:-5, pragmatism:-5, aesthetic:0 },
+    business:  { pragmatism:+20, connection:+5, restraint:0, empathy:-10, aesthetic:-5 }
+  };
+  if (state.direction && dirMap[state.direction]) {
+    for (const k in dirMap[state.direction]) s[k] += dirMap[state.direction][k];
+  }
+
+  // 2. 核心痛点影响（用户最在意什么）
+  const painMap = {
+    p1: { pragmatism:+15, restraint:+5, empathy:-5 },  // 时间
+    p2: { empathy:+20, connection:+5 },                 // 动力
+    p3: { empathy:+10, aesthetic:+5 },                  // 引导
+    p4: { restraint:+20, aesthetic:+5 },                // 简化
+    p5: { connection:+20, empathy:+5 }                  // 社交
+  };
+  const topPain = state.painpoints[0];
+  if (painMap[topPain]) {
+    for (const k in painMap[topPain]) s[k] += painMap[topPain][k];
+  }
+
+  // 3. MVP功能选择影响
+  const featMap = {
+    f1: { empathy:+3 },              // 个人主页
+    f2: { pragmatism:+5 },           // 数据统计
+    f3: { connection:+10 },          // 社交动态
+    f4: { aesthetic:+8 },            // 内容推荐
+    f5: { pragmatism:+5, empathy:+3},// 课程系统
+    f6: { empathy:+8, connection:+3},// 排行榜
+    f7: { aesthetic:+5 },            // 收藏夹
+    f8: { empathy:+2 },              // 通知
+    f9: { pragmatism:+5 },           // 搜索
+    f10:{ connection:+8, empathy:+2 } // 评论
+  };
+  state.features.kept.forEach(f => {
+    if (featMap[f]) {
+      for (const k in featMap[f]) s[k] += featMap[f][k];
+    }
+  });
+
+  // 保留数越少 = 越克制
+  const keptN = state.features.kept.length;
+  if (keptN === 1) s.restraint += 15;
+  else if (keptN === 2) s.restraint += 8;
+  else if (keptN === 3) s.restraint += 3;
+  // 划掉数量也体现了"做减法"的Taste
+  s.restraint += state.features.cut.length * 2;
+
+  // 4. 视觉密度影响
+  const densityMap = {
+    loose: { restraint:+10, aesthetic:+5 },
+    medium:{ aesthetic:+3 },
+    dense: { pragmatism:+5, aesthetic:-5 }
+  };
+  if (densityMap[state.density.value]) {
+    for (const k in densityMap[state.density.value]) s[k] += densityMap[state.density.value][k];
+  }
+
+  // 5. 颜色选择影响
+  const colorMap = {
+    c1: { restraint:+10, aesthetic:+5, empathy:-3 },   // 极简黑白
+    c2: { empathy:+5, connection:+3 },                  // 活力渐变
+    c3: { empathy:+12 },                                // 温暖橙红
+    c4: { pragmatism:+8, restraint:+3 }                 // 商务深蓝
+  };
+  if (colorMap[state.color.id]) {
+    for (const k in colorMap[state.color.id]) s[k] += colorMap[state.color.id][k];
+  }
+
+  // 6. 文案风格影响
+  const copyMap = {
+    cp1: { empathy:+8 },     // 欢迎回来 - 温暖
+    cp2: { empathy:+5, connection:+3 },  // Hi - 活力
+    cp3: { pragmatism:+8, empathy:-5 },  // 登录到账户 - 直接
+    cp4: { empathy:+10, connection:+3 }  // 今天加油 - 趣味陪伴
+  };
+  if (copyMap[state.copy.id]) {
+    for (const k in copyMap[state.copy.id]) s[k] += copyMap[state.copy.id][k];
+  }
+
+  // 归一化到 0-100
+  for (const k in s) {
+    s[k] = Math.max(5, Math.min(95, Math.round(s[k])));
+  }
+  return s;
+}
+
+// 维度对应的"补短板"建议库（关键：培训用，针对短板）
+const DIM_ADVICE = {
+  restraint: {
+    summary: '你更擅长加法而非减法——倾向于"什么都想做"、"什么都不舍得划掉"。这在产品早期容易失焦。',
+    paths: [
+      {
+        title: '每周做一次"功能断舍离"练习',
+        method: '拿出你负责的产品，列出所有功能，然后强制自己圈出"只能保留30%"。这种"被迫取舍"的练习，会让你开始感受"每个功能的机会成本"——不做什么，和做什么同样重要。',
+        action: '本周挑一个自己熟悉的App，用纸笔列出它的所有功能（20+），然后只能圈出6个。然后对比：这款产品如果真的只有6个功能会怎样？'
+      },
+      {
+        title: '建立"反直觉删除"的肌肉记忆',
+        method: '每次想加一个功能时，强制自己先问"能不能不加"。克制力不是"少做"，而是"只做最必要的"——Notion删掉了多少功能才成为Notion，微信否决了多少需求才成为微信。',
+        action: '本月记录10次"我想加XX功能"的冲动，然后思考：如果不加，用户真的会流失吗？如果加了，会稀释核心价值吗？'
+      }
+    ]
+  },
+  empathy: {
+    summary: '你更关注"功能是否可用"而非"用户感受如何"。但用户记住的从来不是功能，是"那一刻的感觉"。',
+    paths: [
+      {
+        title: '开始关注产品的"情感时刻"',
+        method: '用户旅程里总有一些"情感高点"——完成任务时的成就感、发现美好的惊喜感、被产品理解的感动。这些时刻不是"顺便"发生的，是被设计出来的。你要学会识别它们。',
+        action: '下周观察自己使用产品的过程，记录3个让你"嘴角上扬/心里一暖"的瞬间。反推是什么设计触发的：文案？动画？时机？音效？'
+      },
+      {
+        title: '学一门"人学"而不是"产品学"',
+        method: '共情力不是天赋，是训练。心理学、社会学、文学艺术——这些看似"无用"的领域，恰恰是共情力的根。理性产品人补这一课，会打开新的视野。',
+        action: '本月读一本非产品类的书（推荐《非暴力沟通》《也许你该找个人聊聊》），写一篇"这本书如果用在产品设计上"的反思。'
+      }
+    ]
+  },
+  pragmatism: {
+    summary: '你的设计容易偏"理想化"——追求美感和情怀，但可能忽略了"用户真实的使用效率"。',
+    paths: [
+      {
+        title: '做一次"数据真相"冲击',
+        method: '理想主义者的盲区是：以为用户会像自己一样"深度使用"产品。但真实用户的行为数据往往残忍——平均使用时长不到你想象的1/3，大多数功能从未被点过。直面数据，建立"用户不会按预期用"的肌肉。',
+        action: '本周拉取你负责产品的真实使用数据：功能点击率、停留时长、留存率。找出3个"你以为很重要但其实没人用"的功能。'
+      },
+      {
+        title: '做一次"场景化"设计改写',
+        method: '理想设计常常脱离场景（"用户应该会喜欢这个动效"），实用设计紧扣场景（"地铁里单手操作时这个动效会延迟"）。训练自己每做一个设计都问：在什么时间、什么地点、什么状态下？',
+        action: '下次设计前，强制写"用户场景剧本"——具体的时间/地点/人物/情绪/干扰物。画出剧本里的"关键冲突"，设计为这个冲突服务。'
+      }
+    ]
+  },
+  connection: {
+    summary: '你倾向于把产品当作"孤立工具"来设计，可能忽视了"人与人"的维度。即使不做社交产品，理解"用户不是孤岛"也很重要。',
+    paths: [
+      {
+        title: '观察一个你不懂的社区',
+        method: '连接力不是"做社交功能"，是理解人在群体中的行为。找一个你完全不熟悉的社区（小红书某个圈子、B站某个UP主的评论区、贴吧某个分区），当一个月的观察员。你会发现人的多样性远超想象。',
+        action: '本月深度潜伏一个陌生社区（至少每天10分钟）。写下3条"让你惊讶的社区行为规则"，反思这些规则是如何自然形成的。'
+      },
+      {
+        title: '为你的产品加一个"连接功能"思想实验',
+        method: '即使你做的是工具型产品，也可以思考：如果加入一个"连接元素"会怎样？滴答清单如果能看到朋友也在打卡会怎样？Keep的运动数据如果能家人看到会怎样？不是一定要加，但思考过会让你理解"连接的杠杆"。',
+        action: '本周为你的产品画一张"如果加社交元素"的草图：加在哪、怎么加、不破坏核心体验的边界在哪。分享给同事讨论。'
+      }
+    ]
+  },
+  aesthetic: {
+    summary: '你的决策偏"功能导向"——只要能用就行，审美和品质是次要的。但用户其实会为"感觉"买单，细节决定产品气质。',
+    paths: [
+      {
+        title: '每天训练审美肌肉 10 分钟',
+        method: '审美不是天赋，是训练。像练视力一样训练——每天花10分钟看好东西：苹果的产品页、MUJI的设计、国家地理的摄影、Medium的排版。看多了，自然就能分辨"好"和"一般"。',
+        action: '建立"审美参考库"（Notion/Figma/Pinterest都行）。每天放1张你认为"美"的截图，写一句"为什么美"。坚持3个月。'
+      },
+      {
+        title: '重做一个界面的"视觉升级"',
+        method: '审美是手艺——不动手做永远学不会。挑一个你觉得"够用但不美"的界面（哪怕是自己产品的），不改功能，只改视觉：字体、行距、留白、对齐、颜色。对比前后，会理解"审美力"的具体含义。',
+        action: '本月完成一次"视觉重设计"任务：找一个现有界面，画两版——当前版 vs 审美升级版。贴上"修改了什么/为什么"。'
+      }
+    ]
+  }
+};
+
+// 根据五维得分识别短板（得分最低的2个维度），生成建议
+function diagnoseWeaknesses(scores) {
+  const sorted = Object.keys(scores).map(k => ({ key:k, score:scores[k] })).sort((a,b) => a.score - b.score);
+  const weak = sorted.slice(0, 2);   // 最弱的2个
+  const strong = sorted[sorted.length - 1];  // 最强的1个
+  return { weak, strong, sorted };
+}
+
+function decidePersona() {
+  const kept = state.features.kept;
+  const dir = state.direction;
+  const top = state.painpoints[0];
+  const color = state.color.id;
+  const density = state.density.value;
+  const keptNames = kept.map(f => featureNames[f]).join('、') || '少数核心功能';
+
+  // ============ 深度Insight结构：现象 → 为什么 → 引申 ============
+
+  // 极简主义者
+  if (density === 'loose' && (color === 'c1' || color === 'c4') && (top === 'p4' || top === 'p1')) {
+    return {
+      name: '极简主义者',
+      desc: '你相信「少即是多」。在产品决策中，你做减法而非加法，重视用户的核心体验而非功能堆砌。',
+      tags: ['克制', '专注', '永恒感', '功能即美'],
+      insights: [
+        {
+          title: '你保留了极少的核心功能',
+          phenomenon: `你只保留了「${keptNames}」，主动划掉了大部分备选功能。`,
+          reason: '这不是因为你不知道其他功能"也好"，而是你能区分"好"和"必要"——多数新手会全都保留。',
+          implication: '产品大师Dieter Rams说："好的设计就是尽可能少的设计。"你已经有了这种本能。但要警惕"过度极简"——简单到用户不知道怎么用，就是另一种失败。'
+        },
+        {
+          title: '你选择了疏密的视觉密度',
+          phenomenon: `你选了「${state.density.value === 'loose' ? '疏 · 大量留白' : '克制的密度'}」+「${state.color.name}」配色。`,
+          reason: '留白不是"空白"，留白是给用户视觉的"呼吸"。每一个元素都在抢用户注意力，你选择了让最重要的元素胜出。',
+          implication: 'Apple、Notion、Things 都是这种Taste。这种产品看起来"简单"，但开发难度极高——因为每一个像素都要被审视。'
+        },
+        {
+          title: '你的Taste有边界',
+          phenomenon: `你把「${(top==='p4'?'简化':'效率')}」放在用户痛点第一位。`,
+          reason: '这暴露了你对用户的判断：你认为用户的核心问题是"信息过载"或"操作繁琐"，而不是"动力不足"或"找不到同伴"。',
+          implication: '这个判断在工具型产品上是对的，但在社交型/激励型产品上可能错——"动力"才是核心。Taste的成熟，是知道自己适合什么类型的产品。'
+        }
+      ],
+      similar: ['初代微信', 'Notion', 'Linear', 'Things', 'iA Writer'],
+      wechatIntro: '你的极简Taste，与微信价值观高度共鸣。看看你最契合的三条：',
+      wechatHits: [0, 2, 4],  // "用完即走" + "不打扰" + "做正确的事"
+      wechatConclusion: '<strong>你和微信的Taste共识是：</strong>真正的好产品不是"功能越多越好"，而是"功能越少越精"。但要记住：极简不等于"少"，而是"刚刚好"。<br><br>张小龙："一个产品最难的不是加东西，是减东西。"',
+      growthPaths: [
+        {
+          title: `每天反向审视一个产品`,
+          method: `挑一个你常用的产品，问自己：如果这个产品的功能减半，核心价值是否还在？哪些功能是"必要"，哪些只是"想要"？这个练习可以训练你"看见复杂背后的简单"的能力。`,
+          action: `从今天开始，每天花10分钟记录："XX产品如果要做成极简版，我会砍掉___，只保留___。"坚持30天。`
+        },
+        {
+          title: `拥抱约束，设计空杯体验`,
+          method: `极简派最大的风险是"过度克制到用户不会用"。下次做设计时，主动给自己设一个约束：只能用3个按钮、只能展示1屏内容——在约束里做出好体验，才是真功夫。`,
+          action: `本周给一个已有的复杂界面做减法：拿出一张白纸重新画，只保留3个元素。对比原图找差距。`
+        },
+        {
+          title: `研读大师的"减法作品"`,
+          method: `系统研究那些经典的极简产品：Things、iA Writer、初代微信、Notion。不是看他们做了什么，而是理解他们为什么"没做"——每个"没做"的功能背后都有坚定的价值判断。`,
+          action: `本月读完2本书：《设计中的设计》（原研哉）、《The Elements of Typographic Style》。每章总结一句"带走的Taste"。`
+        }
+      ],
+      stories: [
+        {
+          product: 'Instagram',
+          tag: '减法案例',
+          story: 'Instagram的前身叫Burbn，是一个有签到、奖励、计划等多功能的复杂App。CEO凯文·斯特罗姆发现用户只用其中的「拍照分享」功能，毅然砍掉所有其他功能，只保留拍照、滤镜、分享。',
+          takeaway: '当你拿不准要不要做某个功能时，看看用户实际在用什么——多数功能都是产品经理"自己以为"用户需要的。'
+        },
+        {
+          product: 'Things 3',
+          tag: '极简神作',
+          story: 'Things 是一款被苹果设计奖反复颁奖的待办App。它没有标签云、没有团队协作、没有AI——只有最基本的"清单"和"日程"。但正是这种克制，让它成为了一代神器。',
+          takeaway: '不要试图做一个"通用的"产品。给特定人群做"刚好够用"的产品，反而能成为经典。'
+        },
+        {
+          product: '微信朋友圈',
+          tag: '反人性的克制',
+          story: '微信朋友圈最大的"反人性设计"是不显示访客记录、不显示阅读数。这两个数据都很容易获得，但微信坚决不展示。原因是：一旦展示，用户就会变得焦虑、表演、甚至不敢发圈。',
+          takeaway: '产品Taste的最高境界，是知道"什么不该做"。功能上做加法容易，做减法需要勇气和远见。'
+        }
+      ]
+    };
+  }
+
+  // 情感激励派
+  if (top === 'p2' && (color === 'c2' || color === 'c3') && (kept.includes('f6') || kept.includes('f5'))) {
+    return {
+      name: '情感激励派',
+      desc: '你相信产品要有「人情味」。你善于用情感连接和持续激励来打动用户，而不只是冷冰冰的工具。',
+      tags: ['有温度', '会鼓励', '陪伴感', '游戏化'],
+      insights: [
+        {
+          title: '你保留了游戏化机制',
+          phenomenon: `你保留了「${keptNames}」，里面有激励/任务类功能。`,
+          reason: '你深谙人性：用户做事不仅需要"功能可用"，更需要"感觉良好"。每一次的反馈、勋章、进度，都是多巴胺触发器。',
+          implication: '游戏化用得好是Keep、Duolingo；用得不好就是低俗的"金币红包"。区别在于：你的激励是"帮用户成长"还是"骗用户停留"。'
+        },
+        {
+          title: '你选了温暖系的视觉',
+          phenomenon: `你选了「${state.color.name}」+「${state.copy.text}」式文案。`,
+          reason: '颜色和文案是产品的"非语言信号"。温暖的颜色+亲切的文案，会让用户感觉"这个产品是为我设计的，不是流水线产物"。',
+          implication: '小红书、Duolingo、Keep 都是这条路。但要警惕：当温暖变成"过度热情"，反而会让用户觉得虚伪。要像朋友，不要像销售。'
+        },
+        {
+          title: '你看到的是用户的情感需求',
+          phenomenon: '你把「动力」放在用户痛点第一位，而非"时间"或"复杂度"。',
+          reason: '初级产品人解决"功能问题"，高级产品人解决"心理问题"。你已经迈向后者——你看到的不是用户表面的需求，而是用户深层的情感。',
+          implication: '马斯洛的需求层次：用户最高层的需求是"自我实现"。能让用户感到"我变得更好了"的产品，才能赢得长期。'
+        }
+      ],
+      similar: ['Keep', 'Duolingo', '小红书', 'Strava', 'Headspace'],
+      wechatIntro: '微信的"温度"藏在很多细节里。你的情感Taste和这些价值观最契合：',
+      wechatHits: [1, 5, 4],  // "让创造者体现价值" + "用户价值大于商业" + "做正确的事"
+      wechatConclusion: '<strong>你和微信的Taste共识是：</strong>产品不是工具，是"关系"。微信对用户的尊重（不打扰、给创作者价值、用户价值优先），其实就是"温度"的另一种表达。<br><br>张小龙："善良比聪明更重要。"',
+      growthPaths: [
+        {
+          title: `培养对"微表情"的敏感`,
+          method: `情感派的功力在细节——文案的温度、动画的节奏、反馈的时机。每次用产品时，留意自己"哪一刻感到温暖"，然后反推这是由什么触发的，记下来变成自己的素材库。`,
+          action: `准备一个笔记本叫"温度时刻"。每周至少记录3个让你"会心一笑"或"被感动"的产品细节（带截图或描述）。`
+        },
+        {
+          title: `学习心理学而非只学设计`,
+          method: `情感设计的根是心理学。推荐学习"行为设计学"（BJ Fogg）、"心流理论"（Csikszentmihalyi）、"游戏化机制"（Jane McGonigal）。知其然更知其所以然，避免只模仿表面。`,
+          action: `本季度精读：《Hooked》《Don't Make Me Think》《游戏化实战》。每本书都写一篇"用在我产品上会怎样"的读书笔记。`
+        },
+        {
+          title: `警惕PUA式设计，做"朋友"不做"操纵者"`,
+          method: `情感派最大的陷阱是：为了留存而制造焦虑、为了活跃而绑架用户（红点、强提醒、PUA文案）。学会区分"陪伴"和"操纵"，前者让用户离开后想回来，后者让用户离开时有解脱感。`,
+          action: `下次做激励类设计时，问自己3个问题：① 如果用户看穿我的套路会怎么想？② 这个设计5年后回看会不会脸红？③ 我的家人会愿意用吗？`
+        }
+      ],
+      stories: [
+        {
+          product: 'Duolingo',
+          tag: '情感设计典范',
+          story: 'Duolingo的猫头鹰吉祥物Duo，会在用户旷课时发出哀求的表情，"差点哭出来"的样子让无数用户因为"不忍心"而坚持打卡。这个看似可爱的设计背后，是精确的情感心理学。',
+          takeaway: '功能让人来用，情感让人留下。但情感设计有边界——一旦让用户产生"PUA"的感觉，反噬会非常猛烈。'
+        },
+        {
+          product: 'Keep',
+          tag: '激励的艺术',
+          story: 'Keep早期最反直觉的设计：完成训练后不展示"今天消耗多少卡"，而是展示一句鼓励的话+你超越了多少%的人。后者激发的是"我做到了"的成就感，前者只是"我消耗了"的功利感。',
+          takeaway: '同样一个数据，怎么呈现决定了用户的感受。Taste不在于显示什么，而在于显示什么的"叙事方式"。'
+        },
+        {
+          product: '飞书赞赏',
+          tag: '把仪式感做出来',
+          story: '飞书的"对TA说谢谢"功能，不是简单的点赞，而是会生成一张精美的卡片，让收到的人有"被认真对待"的感觉。这个细节让无数飞书用户记住了它。',
+          takeaway: '日常功能里藏着Taste的机会。多走一步——把"功能"变成"仪式感"——就能形成产品的差异化。'
+        }
+      ]
+    };
+  }
+
+  // 实用主义者
+  if (dir === 'business' || (top === 'p1' && dir === 'tool')) {
+    return {
+      name: '实用主义者',
+      desc: '你相信产品要「解决真问题」。你不追求酷炫，而追求"让用户用得爽"——每一个功能都要有清晰的价值。',
+      tags: ['务实', '高效', '直接', '价值导向'],
+      insights: [
+        {
+          title: '你保留的全是高频核心功能',
+          phenomenon: `你的MVP是「${keptNames}」，每个都是用户高频使用的功能。`,
+          reason: '你不被"花哨的炫酷功能"吸引，而是问"这个功能用户每天会用吗"。这是工具型产品的核心思维。',
+          implication: '钉钉、Excel、滴滴打车都是这种Taste。但要警惕"过度功能化"——产品没了温度，用户用完就忘，留存会成为难题。'
+        },
+        {
+          title: '你的视觉传递的是专业感',
+          phenomenon: `你选了「${state.color.name}」+ ${state.btnPos.name}的按钮位置 + ${state.btnShape.name}的按钮形状。`,
+          reason: '专业的产品在视觉上必须可信——颜色克制、按钮清晰、行动召唤强。这不是"好看"，这是让用户敢于把重要的事情托付给你。',
+          implication: 'B端产品（钉钉、企业微信）和金融产品（招行）都用这种Taste。视觉是信任的"门面"——用户看一眼就决定要不要相信你。'
+        },
+        {
+          title: '你看到的是效率痛点',
+          phenomenon: '你把「时间/效率」放在用户痛点第一位。',
+          reason: '"效率"是工具产品的护城河。能帮用户省10分钟的产品，比让用户开心10分钟的产品更有商业价值——因为时间是稀缺的。',
+          implication: '但"效率"也是双刃剑：当用户离开你的产品也能高效工作，你就失去了护城河。所以效率派的关键是建立"工作流"——让用户依赖你的整套体系。'
+        }
+      ],
+      similar: ['钉钉', '滴答清单', '飞书', 'Excel', 'Stripe'],
+      wechatIntro: '实用派的Taste和微信的"克制"哲学有共通处。看看这3条对照：',
+      wechatHits: [0, 2, 5],  // "用完即走" + "不打扰" + "用户价值大于商业"
+      wechatConclusion: '<strong>你和微信的Taste共识是：</strong>"用完即走"——不要让用户被产品困住。微信认为产品是工具，工具的最高境界是"隐形"，让用户专注于自己的事情。<br><br>张小龙："如果一个用户每天都要在你的产品里花很多时间，那不是好事，是浪费用户生命。"',
+      growthPaths: [
+        {
+          title: `从"功能思维"升级到"场景思维"`,
+          method: `实用派容易陷入功能清单思维（我要做A、B、C）。升级的方式是转到场景——用户在什么情境下用？情绪是什么？旁边还有什么干扰？场景决定了怎么呈现功能。`,
+          action: `下次设计功能前，先写一段200字的"用户场景剧本"：一个具体的人（有名字、年龄、职业）在具体的时刻（几点、在哪里）用你的产品做什么。`
+        },
+        {
+          title: `学会做"感性"的功课`,
+          method: `实用派擅长理性分析，但用户是感性的——功能再好，没有情感连接，用户很容易被竞品的"温度"抢走。补齐情感、审美、叙事这三块能力。`,
+          action: `每月看一部电影并写影评（训练叙事感）、每周逛一次美术馆或设计展（训练审美）、每天和一个非本行业的人聊天30分钟（训练共情）。`
+        },
+        {
+          title: `研究"工作流"而非"单点功能"`,
+          method: `工具型产品的护城河是"工作流依赖"——让用户把你嵌入到日常工作流程里。你要研究的不是"一个功能好不好用"，而是"用户上下游的流程是什么，我能不能把他们串起来"。`,
+          action: `画出你产品用户的完整工作流图（含用别家产品的环节），找出3个"可以把别家产品替代掉"的整合机会。`
+        }
+      ],
+      stories: [
+        {
+          product: 'Stripe',
+          tag: '工具的极致',
+          story: 'Stripe是支付工具，但它把"接入支付"这件事做到了极致简单——开发者只需要7行代码。它不做花哨的运营活动，不打广告，但全球开发者都在用。',
+          takeaway: '工具产品最好的营销，是"产品本身好用到让人主动推荐"。在功能上多花一分功夫，比在营销上多花一万的钱有价值。'
+        },
+        {
+          product: '滴答清单',
+          tag: 'B端思维做C端',
+          story: '滴答清单坚持"功能克制"路线，不加社交、不加AI花哨功能，只把基础的待办做到极致。它的付费用户增长慢但稳——10年了还在持续增长，被用户称为"良心App"。',
+          takeaway: '不是所有产品都要"快速增长"。把目标用户服务到极致，让他们终身付费，比烧钱拉新更可持续。'
+        },
+        {
+          product: '飞书文档',
+          tag: '替代Office的Taste',
+          story: '飞书文档没有Word的"保存按钮"——所有修改自动保存。这个看似很小的改动，让用户从"操作工具"变成了"专注内容"。10年前微软觉得"自动保存"风险太大，今天Notion和飞书都在做。',
+          takeaway: '工具产品的Taste，体现在那些"用户根本意识不到"的细节里。最好的产品，是用户用了之后再用别的会觉得"难用"。'
+        }
+      ]
+    };
+  }
+
+  // 关系连接者
+  if (dir === 'social' || kept.includes('f3') || kept.includes('f10')) {
+    return {
+      name: '关系连接者',
+      desc: '你相信产品的核心价值是「连接人与人」。功能只是手段，关系才是目的——用户因为彼此而留下，而不是因为产品功能。',
+      tags: ['人本', '社区感', '互动驱动', '情感纽带'],
+      insights: [
+        {
+          title: '你保留了社交相关功能',
+          phenomenon: `你的MVP里有「社交动态」或「评论互动」类的功能。`,
+          reason: '你懂得"人是社会动物"——孤独的产品永远做不大。社交属性是用户最强的留存动力，也是最强的传播动力。',
+          implication: '即刻、Soul、小红书都靠社交属性长大。但要警惕：社交产品最大的风险是"沉重"。当用户开始"维护关系"而非"享受关系"时，产品就开始衰退。'
+        },
+        {
+          title: '你的视觉是邀请用户参与的',
+          phenomenon: `你选了「${state.copy.text}」式的欢迎语 + ${state.color.name}的配色。`,
+          reason: '社交产品的第一印象很关键——你的视觉传递的是"这里有人"的感觉，而不是"这里是冰冷工具"。',
+          implication: '小红书的封面感、即刻的"圈子"感、Soul的"灵魂匹配"感，都是这种"邀请感"的体现。视觉决定了用户来不来，内容决定了用户留不留。'
+        },
+        {
+          title: '你看到的是关系的力量',
+          phenomenon: '你的设计选择多围绕"用户互动"和"内容生成"。',
+          reason: '工具型产品看重"用户单次使用"，社交型产品看重"用户互相服务"。你已经看到了后者的杠杆——好的社交产品里，用户为用户创造价值，平台只是搭台子。',
+          implication: '社交产品的Taste核心是"克制权力"——平台越想"控制内容"，用户越逃。给用户自由（创作、互动、连接），他们才会自己留下。'
+        }
+      ],
+      similar: ['即刻', 'Soul', '小红书', 'Discord', 'Twitter'],
+      wechatIntro: '微信本质是社交产品，但它的Taste不是"做大"而是"克制"。看看你和它的共鸣：',
+      wechatHits: [3, 4, 5],  // "去中心化" + "做正确的事" + "用户价值大于商业"
+      wechatConclusion: '<strong>你和微信的Taste共识是：</strong>真正的连接，发生在用户之间，而不是平台和用户之间。微信"去中心化"的哲学，就是把舞台让给用户。<br><br>张小龙："朋友圈不是让你关注名人的地方，是让你关注朋友的地方。"',
+      growthPaths: [
+        {
+          title: `研究社区而非只研究产品`,
+          method: `社交产品的Taste在"社区氛围"里。同样的功能，豆瓣和知乎的氛围完全不同——这不是功能造成的，是运营、内容、用户结构共同塑造的。沉浸式做几个社区的"观察员"。`,
+          action: `本季度深度参与3个不同类型的社区（如豆瓣小组、即刻圈子、Discord服务器）。每月写一篇"这个社区是如何养成的"分析报告。`
+        },
+        {
+          title: `学会"给用户让位"`,
+          method: `最好的社交产品，平台是"消失"的——Discord、小红书、即刻都给用户极大的自治权。练习"让位"：下次做功能时，问"能不能让用户自己做"而不是"我们来做"。`,
+          action: `找一个你负责的功能，列出3种"把权力交给用户"的方式（如：用户自选标签vs.平台固定分类）。实施一种，观察效果。`
+        },
+        {
+          title: `阅读社会学、人类学而非只读产品书`,
+          method: `社交产品的根基是"人如何相处"。推荐：《乌合之众》《弱连接的强度》（Granovetter）、《无缘社会》。看懂了人与人的关系，才能设计连接人的产品。`,
+          action: `加入一个线下读书会或兴趣社群（真实连接，不是线上看人发言）。观察自己在群体中的行为，记录3条"人性洞察"。`
+        }
+      ],
+      stories: [
+        {
+          product: '小红书',
+          tag: '内容社交的Taste',
+          story: '小红书早期最反"流量主义"的决定：不显示阅读数，只显示点赞数。原因是：阅读数会让创作者焦虑（为什么阅读高但点赞少），而点赞是"用户主动喜欢"，更真实。',
+          takeaway: '社交产品的关键指标，不是"多少人看了"，而是"多少人在乎"。Taste体现在你选择优化什么数据。'
+        },
+        {
+          product: '即刻',
+          tag: '小而美的社区',
+          story: '即刻明确拒绝"做大"——他们的圈子设计是"小群体高质量讨论"，不追求百万级日活。结果反而成了"高质量信息源"的代名词。',
+          takeaway: '不是所有社交产品都要做成微信。垂直、小众、高质量，也可以是社交产品的Taste。关键是"为谁服务"。'
+        },
+        {
+          product: 'Discord',
+          tag: '让用户搭台',
+          story: 'Discord没有自己的"内容运营"——它把所有的内容创造都交给"服务器"管理员。每一个服务器都是一个独立的小社区，Discord只提供工具。这种"让用户搭台"的Taste，让它成为了Z世代社交的基石。',
+          takeaway: '最好的社交产品，是平台"消失"——用户感觉不到平台在控制他们。给工具，给自由，剩下交给用户。'
+        }
+      ]
+    };
+  }
+
+  // 默认：内容匠人
+  return {
+    name: '内容匠人',
+    desc: '你相信"好内容会自己说话"。你把产品视为内容的容器，让优质内容找到对的用户——你不创造，但你让创造有意义。',
+    tags: ['内容为王', '质量优先', '有审美', '深度优先'],
+    insights: [
+      {
+        title: '你的MVP是为内容服务的',
+        phenomenon: `你保留的「${keptNames}」都是为了"让内容更好被消费/被发现"。`,
+        reason: '你不试图自己生产内容，而是相信"找到对的人来生产，比自己努力生产更有效"。这是平台思维。',
+        implication: '得到、知乎、B站都是这条路。但平台模式有个魔咒：如果创作者生态不健康（流量分配不公、激励不够），平台就会衰退。要持续投入。'
+      },
+      {
+        title: '你的视觉给内容让位',
+        phenomenon: `你选了${state.color.name}的配色+${state.density.value === 'loose' ? '疏的' : state.density.value === 'medium' ? '平衡的' : '密的'}视觉密度。`,
+        reason: '内容产品的视觉原则是"克制"——不要让UI抢内容的风头。设计师的最高境界是"用户没有注意到设计"。',
+        implication: 'Medium、Pocket、Apple News 都是这种Taste。但克制不等于"无聊"——内容产品也需要细节的精致，让用户感觉"在阅读一本好书"。'
+      },
+      {
+        title: '你看到的是内容的力量',
+        phenomenon: '你的功能选择倾向于"信息呈现"而非"信息生产"。',
+        reason: '内容是产品的"灵魂"——同样的功能，内容好的产品是B站，内容差的产品就是其他视频App。你已经意识到了这一点。',
+        implication: '但内容产品有一个长期挑战：内容的边际成本不低。要么自己投入做内容（得到），要么搭建机制让用户做内容（B站、知乎）。这个选择会决定产品的天花板。'
+      }
+    ],
+    similar: ['得到', 'B站', '知乎', 'Medium', 'Pocket'],
+    wechatIntro: '微信的内容生态（公众号、视频号）是中国最克制的内容平台。看看你的Taste和它的共鸣：',
+    wechatHits: [1, 3, 4],  // "让创造者体现价值" + "去中心化" + "做正确的事"
+    wechatConclusion: '<strong>你和微信的Taste共识是：</strong>内容平台的核心是"信任创作者"。微信公众号没有"算法干预"——只看你订阅的人，这是对内容创作者最大的尊重。<br><br>张小龙："优秀的产品和优秀的作品，都是经过无数次反复打磨出来的。"',
+    growthPaths: [
+        {
+          title: `每天消费 1 份高质量内容`,
+          method: `内容产品的Taste是"对内容质量的鉴赏力"。无论是公众号、播客、长文，每天花30分钟在一份"有深度的内容"上，而不是刷短视频。训练自己的"鉴赏肌肉"。`,
+          action: `建立自己的"高质量信源清单"（10-20个）：可以是作者、公众号、Newsletter、播客。每天至少精读/精听一份，写50字感想。`
+        },
+        {
+          title: `研究创作者生态而非只看数据`,
+          method: `内容平台的命脉是创作者。研究B站UP主、公众号作者、知乎大V的生存现状——他们为什么选择你、为什么离开、缺什么、苦什么。这些答案决定你产品能走多远。`,
+          action: `本月深度访谈3位不同层级的创作者（头部/腰部/新手）。每人聊1小时，写一篇"他们的痛点地图"。`
+        },
+        {
+          title: `学会"审美的层次"`,
+          method: `内容产品的视觉比其他产品更关键——字体、排版、留白、行距，都在影响阅读体验。系统学习字体学、排版学，看Apple Books、Medium、The Verge这些行业标杆是怎么做的。`,
+          action: `本月重做一版"你最熟悉产品"的阅读页面：修改字体、行距、留白。上传到小红书/即刻让别人投票，找到审美盲区。`
+        }
+      ],
+      stories: [
+      {
+        product: '微信公众号',
+        tag: '内容生态的Taste',
+        story: '微信公众号刚上线时，业界普遍认为"应该用算法推荐才能涨"。但微信坚持"订阅制"——只有用户主动关注，文章才会出现。结果造就了中国最高质量的内容生态，但也让阅读量天花板不高。',
+        takeaway: '产品Taste是一种"价值取舍"。微信选择了内容质量，放弃了流量天花板。没有完美的方案，只有你愿意为之负责的选择。'
+      },
+      {
+        product: 'Medium',
+        tag: '阅读体验的极致',
+        story: 'Medium 的字体、行距、留白被无数设计师奉为经典。它甚至会根据你的阅读速度，给你"预计阅读时间"——这个小细节让用户对长文不再恐惧。',
+        takeaway: '内容产品的设计核心是"减少阅读阻力"。每一个干扰用户阅读的元素（弹窗、推荐、广告），都是对内容的不尊重。'
+      },
+      {
+        product: '得到',
+        tag: '付费内容的Taste',
+        story: '得到的所有课程都有严格的"逐字稿"——讲师的每一句话都被打磨过。这个看似"低效"的做法，让得到的内容质量远超同行。',
+        takeaway: '内容产品的Taste，体现在你愿意为质量付出多少代价。如果你愿意，用户也会愿意——因为他们看得见。'
+      }
+    ]
+  };
+}
+
+// ================================================================
+// v3 新增：训练计划 + 打卡系统
+// ================================================================
+
+const STORAGE_KEY = 'taste_workshop_plan_v3';
+
+const planState = {
+  candidateTasks: [],
+  selectedIds: [],
+  duration: 14,
+  planName: '',
+  plan: null
+};
+
+function buildCandidateTasks() {
+  const scores = calcTasteScores();
+  const diag = diagnoseWeaknesses(scores);
+  const weakDims = diag.weak.map(w => w.key);
+  const tasks = [];
+  weakDims.forEach(dimKey => {
+    DIM_ADVICE[dimKey].paths.forEach((p, i) => {
+      tasks.push({
+        id: dimKey + '_' + i,
+        dimKey,
+        dimName: TASTE_DIMS[dimKey].name,
+        title: p.title,
+        method: p.method,
+        action: p.action
+      });
+    });
+  });
+  return tasks;
+}
+
+function initPlanSetup() {
+  const existing = loadPlan();
+  if (existing && !existing.abandoned) {
+    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+    document.getElementById('scene-checkIn').classList.add('active');
+    initCheckIn();
+    return false;
+  }
+
+  planState.candidateTasks = buildCandidateTasks();
+  planState.selectedIds = [];
+  planState.duration = 14;
+  planState.planName = '';
+
+  const wrap = document.getElementById('planTasks');
+  wrap.innerHTML = planState.candidateTasks.map(t => `
+    <div class="plan-task" data-id="${t.id}" onclick="togglePlanTask('${t.id}')">
+      <div class="tk-check"></div>
+      <div class="tk-body">
+        <div>
+          <span class="tk-dim-label">${t.dimName}</span>
+          <span class="tk-title">${t.title}</span>
+        </div>
+        <div class="tk-action">${t.action}</div>
+      </div>
+    </div>
+  `).join('');
+
+  document.querySelectorAll('#durationOptions .duration-option').forEach(o => o.classList.remove('selected'));
+  const d14 = document.querySelector('#durationOptions [data-days="14"]');
+  if (d14) d14.classList.add('selected');
+
+  const input = document.getElementById('planNameInput');
+  input.value = '';
+  refreshPlanPreview();
+
+  input.oninput = e => {
+    planState.planName = e.target.value.trim();
+    refreshPlanPreview();
+  };
+
+  return true;
+}
+
+function togglePlanTask(id) {
+  const el = document.querySelector('.plan-task[data-id="' + id + '"]');
+  const idx = planState.selectedIds.indexOf(id);
+  if (idx > -1) {
+    planState.selectedIds.splice(idx, 1);
+    el.classList.remove('picked');
+  } else {
+    if (planState.selectedIds.length >= 3) {
+      showTaste('最多选 3 个任务——贪多嚼不烂。');
+      return;
+    }
+    planState.selectedIds.push(id);
+    el.classList.add('picked');
+  }
+  refreshPlanPreview();
+}
+
+function pickDuration(el, days) {
+  document.querySelectorAll('#durationOptions .duration-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  planState.duration = days;
+  refreshPlanPreview();
+}
+
+function refreshPlanPreview() {
+  document.getElementById('previewName').textContent = planState.planName || '（尚未命名）';
+  document.getElementById('previewDur').textContent = planState.duration + ' 天';
+  document.getElementById('previewCount').textContent = planState.selectedIds.length + ' 个';
+  const today = new Date();
+  document.getElementById('previewStart').textContent = fmtDate(today);
+  const end = new Date(today);
+  end.setDate(end.getDate() + planState.duration - 1);
+  document.getElementById('previewEnd').textContent = fmtDate(end);
+
+  const btn = document.getElementById('btnStartPlan');
+  const ok = planState.selectedIds.length >= 1 && planState.planName.length >= 2;
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? '1' : '0.4';
+}
+
+function startPlan() {
+  if (planState.selectedIds.length < 1) { showTaste('至少选一个任务'); return; }
+  if (planState.planName.length < 2) { showTaste('给你的计划起个名字吧'); return; }
+
+  const today = new Date();
+  const tasks = planState.candidateTasks.filter(t => planState.selectedIds.includes(t.id));
+
+  planState.plan = {
+    name: planState.planName,
+    duration: planState.duration,
+    startDate: today.toISOString().slice(0,10),
+    tasks,
+    checkins: {},
+    abandoned: false,
+    createdAt: Date.now()
+  };
+  savePlan();
+
+  showTaste('训练计划「' + planState.planName + '」已开启！每天打卡，见证自己的改变。');
+  document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+  document.getElementById('scene-checkIn').classList.add('active');
+  window.scrollTo(0, 0);
+  initCheckIn();
+}
+
+function initCheckIn() {
+  const plan = loadPlan();
+  if (!plan || plan.abandoned) {
+    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+    document.getElementById('scene-planSetup').classList.add('active');
+    initPlanSetup();
+    return;
+  }
+  planState.plan = plan;
+
+  document.getElementById('chPlanName').textContent = plan.name;
+  document.getElementById('chPlanMeta').textContent = plan.duration + '天 · ' + plan.tasks.length + ' 个任务';
+
+  renderCheckInProgress();
+  renderCheckInCalendar();
+  renderTodayTasks();
+  renderCheckInHistory();
+}
+
+function currentDayIndex() {
+  const plan = planState.plan;
+  const start = new Date(plan.startDate + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  return Math.floor((today - start) / (1000*60*60*24));
+}
+
+function renderCheckInProgress() {
+  const plan = planState.plan;
+  const dayIdx = currentDayIndex();
+  const curDay = Math.max(1, Math.min(plan.duration, dayIdx + 1));
+  document.getElementById('chDay').textContent = curDay;
+
+  let doneCount = 0;
+  const total = plan.duration * plan.tasks.length;
+  Object.values(plan.checkins).forEach(dayMap => {
+    Object.values(dayMap).forEach(rec => { if (rec.done) doneCount++; });
+  });
+  const rate = total > 0 ? Math.round(doneCount / total * 100) : 0;
+  document.getElementById('chRate').textContent = rate + '%';
+
+  let streak = 0;
+  const maxDay = Math.min(plan.duration, dayIdx + 1);
+  for (let i = maxDay - 1; i >= 0; i--) {
+    const date = dateFromIndex(i);
+    if (isDayFullyChecked(date)) streak++;
+    else break;
+  }
+  document.getElementById('chStreak').textContent = streak;
+
+  document.getElementById('chProgLabel').textContent = '整体进度  ·  已完成 ' + doneCount + ' / ' + total + ' 次打卡';
+  document.getElementById('chProgVal').textContent = doneCount + ' / ' + total;
+  document.getElementById('chProgBar').style.width = rate + '%';
+}
+
+function dateFromIndex(i) {
+  const plan = planState.plan;
+  const d = new Date(plan.startDate + 'T00:00:00');
+  d.setDate(d.getDate() + i);
+  return d;
+}
+
+function isDayFullyChecked(date) {
+  const plan = planState.plan;
+  const key = date.toISOString().slice(0,10);
+  const dayMap = plan.checkins[key] || {};
+  return plan.tasks.every(t => dayMap[t.id] && dayMap[t.id].done);
+}
+
+function renderCheckInCalendar() {
+  const plan = planState.plan;
+  const wrap = document.getElementById('chCalendar');
+  const todayIdx = currentDayIndex();
+  const html = [];
+  for (let i = 0; i < plan.duration; i++) {
+    const date = dateFromIndex(i);
+    const key = date.toISOString().slice(0,10);
+    const isToday = i === todayIdx;
+    const isFuture = i > todayIdx;
+    const dayMap = plan.checkins[key] || {};
+    const doneCount = plan.tasks.filter(t => dayMap[t.id] && dayMap[t.id].done).length;
+    const allDone = doneCount === plan.tasks.length && plan.tasks.length > 0;
+    const missed = !isFuture && !isToday && !allDone;
+
+    let cls = 'ch-day';
+    if (isToday) cls += ' today';
+    if (allDone) cls += ' done';
+    if (isFuture) cls += ' future';
+    if (missed) cls += ' missed';
+
+    html.push('<div class="' + cls + '"><div class="d-num">' + (i+1) + '</div></div>');
+  }
+  wrap.innerHTML = html.join('');
+}
+
+function renderTodayTasks() {
+  const plan = planState.plan;
+  const todayIdx = currentDayIndex();
+  const today = new Date();
+
+  document.getElementById('chTodayDate').textContent = 'Day ' + Math.max(1, Math.min(plan.duration, todayIdx+1)) + '  ·  ' + fmtDate(today);
+
+  const wrap = document.getElementById('chTodayTasks');
+
+  if (todayIdx < 0) {
+    wrap.innerHTML = '<div class="empty-state">计划还没有开始——开始日期是 ' + plan.startDate + '。</div>';
+    return;
+  }
+  if (todayIdx >= plan.duration) {
+    wrap.innerHTML = '<div class="empty-state">🎉 训练周期已结束！来看看你累积的打卡反思吧。</div>';
+    return;
+  }
+
+  const key = today.toISOString().slice(0,10);
+  const dayMap = plan.checkins[key] || {};
+
+  wrap.innerHTML = plan.tasks.map(t => {
+    const rec = dayMap[t.id];
+    const done = rec && rec.done;
+    return `
+      <div class="today-task ${done ? 'done' : ''}" data-id="${t.id}">
+        <div class="tt-head">
+          <span class="tt-dim">${t.dimName}</span>
+          <span class="tt-title">${t.title}</span>
+        </div>
+        <div class="tt-action">${t.action}</div>
+        ${done ? `
+          <div style="margin-top:10px; padding:10px 12px; background:rgba(74,222,128,0.06); border-radius:8px; font-size:0.85em; color:#aaa;">
+            <strong style="color:#4ade80;">今日反思：</strong> ${rec.reflect || '（无反思记录）'}
+          </div>
+        ` : `
+          <textarea id="reflect_${t.id}" placeholder="简单记录今天做了什么/什么感受（可留空）"></textarea>
+          <div class="tt-footer">
+            <span style="font-size:0.78em; color:#888;">打卡后不可撤回，请确认已完成再提交</span>
+            <button class="btn-checkin" onclick="checkinTask('${t.id}')">打卡完成</button>
+          </div>
+        `}
+      </div>
+    `;
+  }).join('');
+}
+
+function checkinTask(taskId) {
+  const plan = planState.plan;
+  const today = new Date().toISOString().slice(0,10);
+  const ta = document.getElementById('reflect_' + taskId);
+  const reflect = (ta && ta.value || '').trim();
+  if (!plan.checkins[today]) plan.checkins[today] = {};
+  plan.checkins[today][taskId] = { done:true, reflect, time:Date.now() };
+  savePlan();
+  showTaste('打卡成功！每一次坚持都在重塑你的Taste。');
+  renderCheckInProgress();
+  renderCheckInCalendar();
+  renderTodayTasks();
+  renderCheckInHistory();
+}
+
+function renderCheckInHistory() {
+  const plan = planState.plan;
+  const wrap = document.getElementById('chHistory');
+  const records = [];
+  Object.keys(plan.checkins).sort().reverse().forEach(date => {
+    const dayMap = plan.checkins[date];
+    Object.keys(dayMap).forEach(tid => {
+      const rec = dayMap[tid];
+      if (!rec.done) return;
+      const task = plan.tasks.find(t => t.id === tid);
+      if (!task) return;
+      records.push({ date, task, rec });
+    });
+  });
+
+  if (records.length === 0) {
+    wrap.innerHTML = '<div class="empty-state">还没有打卡记录。完成今天的任务来开启你的Taste成长档案吧。</div>';
+    return;
+  }
+
+  wrap.innerHTML = records.map(r => `
+    <div class="history-item">
+      <div class="h-date">${r.date.slice(5)}</div>
+      <div class="h-content">
+        <span style="font-size:0.72em; color:#fb923c; padding:1px 7px; background:rgba(251,146,60,0.1); border-radius:4px; margin-right:6px;">${r.task.dimName}</span>
+        <span class="h-task-name">${r.task.title}</span>
+        ${r.rec.reflect ? `<div class="h-reflect">💭 ${r.rec.reflect}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function confirmAbandonPlan() {
+  if (!confirm('确定要放弃当前训练计划吗？\n\n已打卡的记录会保留，但计划状态会标记为"已放弃"，你可以重新搭建产品后开启新计划。')) return;
+  const plan = loadPlan();
+  if (plan) {
+    plan.abandoned = true;
+    plan.abandonedAt = Date.now();
+    savePlan(plan);
+  }
+  planState.plan = null;
+  showTaste('已放弃当前计划。重新走一遍测评，可以发现新的短板。');
+  document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+  document.getElementById('scene-result').classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function fmtDate(d) {
+  const m = (d.getMonth()+1).toString().padStart(2,'0');
+  const day = d.getDate().toString().padStart(2,'0');
+  return d.getFullYear() + '-' + m + '-' + day;
+}
+
+function savePlan(p) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p || planState.plan)); }
+  catch(e) { console.warn('save fail', e); }
+}
+function loadPlan() {
+  try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : null; }
+  catch(e) { return null; }
+}
+
+// 包装原 goScene，切到 planSetup/checkIn 时做初始化
+const _origGoScene = window.goScene;
+window.goScene = function(name) {
+  _origGoScene(name);
+  if (name === 'planSetup') initPlanSetup();
+  if (name === 'checkIn') initCheckIn();
+  if (name === 'style') initStyleScene();
+};
+
+window.addEventListener('DOMContentLoaded', () => {
+  const p = loadPlan();
+  if (p && !p.abandoned) {
+    console.log('检测到进行中的训练计划:', p.name);
+  }
+});
+
+function restart() {
+  // 重置所有状态
+  Object.assign(state, {
+    direction: null, user: null, userNeeds: null, scenario: null,
+    painpoints: ['p1','p2','p3','p4','p5'],
+    features: { kept: [], cut: [] },
+    color: { id: 'c1', bg: 'linear-gradient(135deg,#1a1a1a,#444)', name: '极简黑白' },
+    copy: { id: 'cp1', text: '欢迎回来' },
+    btnShape: { id: 'bs2', radius: 8, name: '小圆角' },
+    btnPos: { value: 'bottom', name: '底部固定' },
+    nav: { value: 'bottom', name: '底部Tab' },
+    radius: { id: 'r3', value: 14, name: '柔和' },
+    density: { id: 'd1', value: 'loose' }
+  });
+  // 重置 UI
+  // v3.1：隐藏需求排序区
+  const ns = document.getElementById('needsRankSection');
+  if (ns) ns.style.display = 'none';
+  document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('.matched').forEach(el => el.classList.remove('matched'));
+  document.querySelectorAll('.kept, .removed').forEach(el => el.classList.remove('kept','removed'));
+  document.querySelectorAll('.feat-btn.active').forEach(el => el.classList.remove('active'));
+  document.getElementById('keptCount').textContent = '0';
+  document.getElementById('cutCount').textContent = '0';
+  document.getElementById('totalLeft').textContent = '10';
+  document.getElementById('btnMvpNext').disabled = true;
+  document.getElementById('mvpStatus').textContent = '至少保留 1 个核心功能即可继续';
+  // 默认选中
+  document.querySelector('[data-id="c1"]').classList.add('selected');
+  document.querySelector('[data-id="cp1"]').classList.add('selected');
+  document.querySelector('[data-id="d1"]').classList.add('selected');
+  document.querySelector('#btnShapeGrid [data-id="bs2"]').classList.add('selected');
+  document.querySelector('#btnPosGrid [data-pos="bottom"]').classList.add('selected');
+  document.querySelector('#navGrid [data-nav="bottom"]').classList.add('selected');
+  document.querySelector('#radiusGrid [data-id="r3"]').classList.add('selected');
+  goScene('welcome');
+}
+</script>
+</body>
+</html>
